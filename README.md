@@ -2,6 +2,12 @@
 
 This repository contains a shareable Codex skill for creating editable first-draft PowerPoint decks from FAO AMR source materials.
 
+## Start Here
+
+- New users: read [docs/USER_MANUAL.md](docs/USER_MANUAL.md).
+- Repository owners: read [docs/SHARING_CHECKLIST.md](docs/SHARING_CHECKLIST.md).
+- Codex skill files: see `skills/fao-amr-pptx-builder/`.
+
 The skill lives at:
 
 ```text
@@ -14,7 +20,7 @@ This is a working v1 Codex skill. It can be installed into another Codex setup a
 
 - Access to this private GitHub repository.
 - Python 3.10 or newer.
-- The Python dependencies in `pyproject.toml`.
+- The Python dependencies in `requirements.txt` or `pyproject.toml`.
 - A local folder containing the FAO AMR materials, such as a OneDrive-synced folder.
 - A PowerPoint template file when template-based output is desired.
 
@@ -31,6 +37,12 @@ Install the Codex skill from https://github.com/ManlingXu/fao-amr-pptx-builder/t
 For private-repo installs, the target machine must already have GitHub access through an authenticated browser, Git credentials, or `GITHUB_TOKEN` / `GH_TOKEN`.
 
 After installation, restart Codex so the new skill is discovered.
+
+Install Python dependencies with:
+
+```powershell
+python -m pip install -r requirements.txt
+```
 
 It is designed for prompts such as:
 
