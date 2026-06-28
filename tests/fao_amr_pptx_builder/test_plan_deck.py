@@ -122,6 +122,29 @@ def test_plan_deck_returns_evidence_gap_plan_when_index_has_no_relevant_evidence
     assert all("src001" not in slide["source_ids"] for slide in content_slides)
 
 
+def test_plan_deck_returns_evidence_gap_plan_for_generic_admin_action_plan_text():
+    index = [
+        {
+            "source_id": "src001",
+            "text": (
+                "The country office action plan improves food safety and health service use "
+                "for staff meetings."
+            ),
+            "relative_path": "admin.txt",
+            "location": "document",
+            "kind": "document",
+        }
+    ]
+
+    module = load_module()
+    plan = module.plan_deck("give me a PPT of AMR history in FAO", index)
+
+    assert plan["title"] == "Evidence gap: AMR history in FAO"
+    content_slides = [slide for slide in plan["slides"] if slide["layout"] == "content"]
+    assert content_slides
+    assert all("src001" not in slide["source_ids"] for slide in content_slides)
+
+
 def test_plan_deck_excludes_extraction_warning_from_content_slide_sources():
     index = [
         {

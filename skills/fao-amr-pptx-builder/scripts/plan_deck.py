@@ -45,6 +45,25 @@ FAO_AMR_KEYWORDS = {
     "use",
 }
 
+STRONG_FAO_AMR_SIGNALS = {
+    "agrifood",
+    "agriculture",
+    "amr",
+    "antimicrobial",
+    "fao",
+    "governance",
+    "quadripartite",
+    "resistance",
+    "surveillance",
+    "veterinary",
+}
+
+STRONG_FAO_AMR_PHRASES = {
+    "antimicrobial resistance",
+    "one health",
+    "responsible antimicrobial use",
+}
+
 STOPWORDS = {
     "a",
     "about",
@@ -84,6 +103,19 @@ def _evidence_score(text: str, query: str) -> int:
     return title_score + keyword_score
 
 
+def _has_strong_fao_amr_signal(source_item: dict) -> bool:
+    searchable = " ".join(
+        str(source_item.get(field, ""))
+        for field in ("text", "relative_path", "source_id", "url", "source_url", "domain")
+    ).lower()
+    terms = _terms(searchable)
+    return bool(
+        terms & STRONG_FAO_AMR_SIGNALS
+        or any(phrase in searchable for phrase in STRONG_FAO_AMR_PHRASES)
+        or "fao.org" in searchable
+    )
+
+
 def _is_warning_source(source_item: dict) -> bool:
     return str(source_item.get("location", "")).strip().lower() == "extraction warning"
 
@@ -95,6 +127,7 @@ def _usable_index(index: list[dict], query: str) -> list[dict]:
         if not _is_warning_source(item)
         and item.get("source_id")
         and str(item.get("text", "")).strip()
+        and _has_strong_fao_amr_signal(item)
         and _evidence_score(item.get("text", ""), query) > 0
     ]
 
