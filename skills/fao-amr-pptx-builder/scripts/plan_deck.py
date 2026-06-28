@@ -20,6 +20,48 @@ DEFAULT_HISTORY_OUTLINE = [
     "Sources",
 ]
 
+FAO_AMR_KEYWORDS = {
+    "action",
+    "agrifood",
+    "agriculture",
+    "amr",
+    "antimicrobial",
+    "collaboration",
+    "country",
+    "countries",
+    "evidence",
+    "fao",
+    "food",
+    "governance",
+    "health",
+    "milestones",
+    "one",
+    "plan",
+    "quadripartite",
+    "resistance",
+    "responsible",
+    "surveillance",
+    "timeline",
+    "use",
+}
+
+STOPWORDS = {
+    "a",
+    "about",
+    "an",
+    "and",
+    "for",
+    "give",
+    "in",
+    "me",
+    "of",
+    "on",
+    "ppt",
+    "powerpoint",
+    "the",
+    "to",
+}
+
 
 def _slug_title(prompt: str) -> str:
     lowered = prompt.lower()
@@ -30,14 +72,31 @@ def _slug_title(prompt: str) -> str:
     return " ".join(words[:8]).strip().title() or "FAO AMR PowerPoint Draft"
 
 
-def _score(text: str, title: str) -> int:
-    terms = set(re.findall(r"[a-z0-9]+", title.lower()))
+def _terms(text: str) -> set[str]:
+    return {term for term in re.findall(r"[a-z0-9]+", text.lower()) if term not in STOPWORDS}
+
+
+def _evidence_score(text: str, query: str) -> int:
     haystack = text.lower()
-    return sum(1 for term in terms if term in haystack)
+    query_terms = _terms(query)
+    title_score = sum(3 for term in query_terms if term in haystack)
+    keyword_score = sum(1 for term in FAO_AMR_KEYWORDS if term in haystack)
+    return title_score + keyword_score
 
 
 def _is_warning_source(source_item: dict) -> bool:
     return str(source_item.get("location", "")).strip().lower() == "extraction warning"
+
+
+def _usable_index(index: list[dict], query: str) -> list[dict]:
+    return [
+        item
+        for item in index
+        if not _is_warning_source(item)
+        and item.get("source_id")
+        and str(item.get("text", "")).strip()
+        and _evidence_score(item.get("text", ""), query) > 0
+    ]
 
 
 def _select_sources(index: list[dict], title: str, limit: int = 3, allow_warning: bool = False) -> list[str]:
@@ -45,7 +104,7 @@ def _select_sources(index: list[dict], title: str, limit: int = 3, allow_warning
     ranked = sorted(
         candidates,
         key=lambda item: (
-            _score(item.get("text", ""), title),
+            _evidence_score(item.get("text", ""), title),
             item.get("kind", "") == "presentation",
         ),
         reverse=True,
@@ -56,7 +115,7 @@ def _select_sources(index: list[dict], title: str, limit: int = 3, allow_warning
         source_id = item.get("source_id")
         if not source_id or source_id in seen:
             continue
-        if _score(item.get("text", ""), title) <= 0:
+        if _evidence_score(item.get("text", ""), title) <= 0:
             continue
         selected.append(source_id)
         seen.add(source_id)
@@ -65,27 +124,126 @@ def _select_sources(index: list[dict], title: str, limit: int = 3, allow_warning
     return selected
 
 
-def _bullets_for(title: str) -> list[str]:
+def _split_fragments(text: str) -> list[str]:
+    normalized = re.sub(r"\s+", " ", text).strip()
+    fragments = re.split(r"(?<=[.!?;])\s+|\s+[•\-]\s+", normalized)
+    return [fragment.strip(" .;:\t\r\n") for fragment in fragments if fragment.strip(" .;:\t\r\n")]
+
+
+def _presentation_bullet(fragment: str, max_words: int = 18, max_chars: int = 140) -> str:
+    words = fragment.split()
+    if len(words) > max_words:
+        fragment = " ".join(words[:max_words])
+    if len(fragment) > max_chars:
+        fragment = fragment[:max_chars].rsplit(" ", 1)[0]
+    return fragment.strip(" .;:")
+
+
+def _ranked_fragments(index: list[dict], title: str) -> list[tuple[int, bool, str, str]]:
+    ranked: list[tuple[int, bool, str, str]] = []
+    for item in index:
+        source_id = item.get("source_id", "")
+        if not source_id or _is_warning_source(item):
+            continue
+        for fragment in _split_fragments(item.get("text", "")):
+            score = _evidence_score(fragment, title)
+            if score <= 0:
+                continue
+            ranked.append((score, item.get("kind", "") == "presentation", fragment, source_id))
+    return sorted(ranked, key=lambda entry: (entry[0], entry[1], len(entry[2])), reverse=True)
+
+
+def _bullets_for(title: str, index: list[dict]) -> list[str]:
     if title == "Sources":
-        return [
-            "Review source map for slide-level evidence",
-            "Verify internal clearance before external use",
-        ]
-    if title == "Closing or discussion":
-        return [
-            "Summarize the main historical arc",
-            "Connect past milestones to current FAO AMR priorities",
-            "Invite discussion on next steps",
-        ]
-    return [
-        f"Summarize the FAO AMR relevance of {title.lower()}",
-        "Reuse strong points from previous FAO AMR presentations when available",
-        "Support key claims with report evidence and source notes",
-    ]
+        source_lines = []
+        seen = set()
+        for item in index:
+            source_id = item.get("source_id")
+            if not source_id or source_id in seen or _is_warning_source(item):
+                continue
+            seen.add(source_id)
+            source_lines.append(
+                _presentation_bullet(
+                    f"{item.get('relative_path', 'source')} ({item.get('location', 'source')})"
+                )
+            )
+            if len(source_lines) >= 5:
+                break
+        return source_lines or ["No usable source evidence was available"]
+
+    bullets: list[str] = []
+    seen_text = set()
+    for _score_value, _is_presentation, fragment, _source_id in _ranked_fragments(index, title):
+        bullet = _presentation_bullet(fragment)
+        key = bullet.lower()
+        if key in seen_text:
+            continue
+        bullets.append(bullet)
+        seen_text.add(key)
+        if len(bullets) >= 3:
+            break
+    return bullets
+
+
+def _source_ids_for_bullets(title: str, index: list[dict], limit: int = 3) -> list[str]:
+    source_ids: list[str] = []
+    seen = set()
+    for _score_value, _is_presentation, _fragment, source_id in _ranked_fragments(index, title):
+        if source_id in seen:
+            continue
+        source_ids.append(source_id)
+        seen.add(source_id)
+        if len(source_ids) >= limit:
+            break
+    return source_ids
+
+
+def _evidence_gap_plan(prompt: str, title: str) -> dict:
+    gap_title = f"Evidence gap: {title}"
+    return {
+        "prompt": prompt,
+        "title": gap_title,
+        "slides": [
+            {
+                "slide_number": 1,
+                "layout": "title",
+                "title": gap_title,
+                "bullets": [],
+                "speaker_notes": "",
+                "source_ids": [],
+            },
+            {
+                "slide_number": 2,
+                "layout": "content",
+                "title": "Evidence gap",
+                "bullets": [
+                    "No relevant non-warning source evidence was found in the indexed materials",
+                    "A polished FAO AMR deck needs traceable prior slides, reports, or approved source notes",
+                ],
+                "speaker_notes": "",
+                "source_ids": [],
+            },
+            {
+                "slide_number": 3,
+                "layout": "content",
+                "title": "Materials needed",
+                "bullets": [
+                    "Add OneDrive-synced FAO AMR presentations, action plans, reports, or surveillance materials",
+                    "Rerun source scanning and indexing before drafting the full deck",
+                ],
+                "speaker_notes": "",
+                "source_ids": [],
+            },
+        ],
+    }
 
 
 def plan_deck(prompt: str, index: list[dict], max_slides: int = 11) -> dict:
     title = _slug_title(prompt)
+    usable_index = _usable_index(index, f"{prompt} {title}")
+    if not usable_index:
+        return _evidence_gap_plan(prompt, title)
+
     if title == "AMR history in FAO":
         outline = DEFAULT_HISTORY_OUTLINE
     else:
@@ -103,9 +261,13 @@ def plan_deck(prompt: str, index: list[dict], max_slides: int = 11) -> dict:
                 "slide_number": number,
                 "layout": layout,
                 "title": slide_title,
-                "bullets": [] if is_title else _bullets_for(slide_title),
+                "bullets": [] if is_title else _bullets_for(slide_title, usable_index),
                 "speaker_notes": "",
-                "source_ids": [] if is_title else _select_sources(index, slide_title, allow_warning=allow_warning_sources),
+                "source_ids": []
+                if is_title
+                else _select_sources(index, slide_title, allow_warning=allow_warning_sources)
+                if is_sources_layout
+                else _source_ids_for_bullets(slide_title, usable_index),
             }
         )
     return {"prompt": prompt, "title": title, "slides": slides}

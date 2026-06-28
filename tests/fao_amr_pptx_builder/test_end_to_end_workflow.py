@@ -12,6 +12,12 @@ SCAN = ROOT / "skills/fao-amr-pptx-builder/scripts/scan_sources.py"
 INDEX = ROOT / "skills/fao-amr-pptx-builder/scripts/build_source_index.py"
 PLAN = ROOT / "skills/fao-amr-pptx-builder/scripts/plan_deck.py"
 CREATE = ROOT / "skills/fao-amr-pptx-builder/scripts/create_pptx.py"
+SCAFFOLD_PHRASES = (
+    "summarize",
+    "reuse strong points",
+    "support key claims",
+    "invite discussion",
+)
 
 
 def _slide_texts(slide) -> list[str]:
@@ -69,7 +75,31 @@ def test_end_to_end_workflow_creates_editable_pptx(tmp_path):
     assert output.exists()
     assert source_map.exists()
     plan_payload = json.loads(plan.read_text(encoding="utf-8"))
+    index_payload = json.loads(index.read_text(encoding="utf-8"))
     assert plan_payload["title"] == "AMR history in FAO"
+    assert index_payload
+    assert not plan_payload["title"].lower().startswith("evidence gap")
+    normal_bullets = [
+        bullet
+        for slide_plan in plan_payload["slides"]
+        if slide_plan["layout"] == "content"
+        for bullet in slide_plan["bullets"]
+    ]
+    assert normal_bullets
+    assert not any(
+        phrase in bullet.lower()
+        for bullet in normal_bullets
+        for phrase in SCAFFOLD_PHRASES
+    )
+    substantive_slides = [
+        slide_plan
+        for slide_plan in plan_payload["slides"]
+        if slide_plan["layout"] == "content"
+    ]
+    sourced_substantive_slides = [
+        slide_plan for slide_plan in substantive_slides if slide_plan["source_ids"]
+    ]
+    assert len(sourced_substantive_slides) >= max(1, int(len(substantive_slides) * 0.75))
     generated = Presentation(str(output))
     assert len(generated.slides) == len(plan_payload["slides"])
 
