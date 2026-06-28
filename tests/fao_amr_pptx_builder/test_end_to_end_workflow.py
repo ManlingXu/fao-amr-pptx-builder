@@ -3,6 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx import Presentation
 
 
@@ -11,6 +12,14 @@ SCAN = ROOT / "skills/fao-amr-pptx-builder/scripts/scan_sources.py"
 INDEX = ROOT / "skills/fao-amr-pptx-builder/scripts/build_source_index.py"
 PLAN = ROOT / "skills/fao-amr-pptx-builder/scripts/plan_deck.py"
 CREATE = ROOT / "skills/fao-amr-pptx-builder/scripts/create_pptx.py"
+
+
+def _slide_texts(slide) -> list[str]:
+    texts: list[str] = []
+    for shape in slide.shapes:
+        if hasattr(shape, "text") and shape.text.strip():
+            texts.append(shape.text.strip())
+    return texts
 
 
 def test_end_to_end_workflow_creates_editable_pptx(tmp_path):
@@ -28,14 +37,71 @@ def test_end_to_end_workflow_creates_editable_pptx(tmp_path):
     plan = tmp_path / "deck_plan.json"
     output = tmp_path / "draft.pptx"
     source_map = tmp_path / "source_map.json"
+    template = tmp_path / "template.pptx"
+
+    template_prs = Presentation()
+    sample_slide = template_prs.slides.add_slide(template_prs.slide_layouts[1])
+    sample_slide.shapes.title.text = "Template sample slide"
+    sample_slide.placeholders[1].text = "REMOVE ME FROM GENERATED DECK"
+    template_prs.save(template)
 
     subprocess.run([sys.executable, str(SCAN), "--source-folder", str(materials), "--output", str(sources)], check=True)
     subprocess.run([sys.executable, str(INDEX), "--sources", str(sources), "--output", str(index)], check=True)
     subprocess.run([sys.executable, str(PLAN), "--prompt", "give me a PPT of AMR history in FAO", "--index", str(index), "--output", str(plan)], check=True)
-    subprocess.run([sys.executable, str(CREATE), "--plan", str(plan), "--index", str(index), "--output", str(output), "--source-map", str(source_map)], check=True)
+    subprocess.run(
+        [
+            sys.executable,
+            str(CREATE),
+            "--plan",
+            str(plan),
+            "--index",
+            str(index),
+            "--output",
+            str(output),
+            "--template",
+            str(template),
+            "--source-map",
+            str(source_map),
+        ],
+        check=True,
+    )
 
     assert output.exists()
     assert source_map.exists()
-    assert json.loads(plan.read_text(encoding="utf-8"))["title"] == "AMR history in FAO"
+    plan_payload = json.loads(plan.read_text(encoding="utf-8"))
+    assert plan_payload["title"] == "AMR history in FAO"
     generated = Presentation(str(output))
-    assert len(generated.slides) >= 10
+    assert len(generated.slides) == len(plan_payload["slides"])
+
+    all_text = "\n".join(text for slide in generated.slides for text in _slide_texts(slide))
+    assert "REMOVE ME FROM GENERATED DECK" not in all_text
+    assert "Template sample slide" not in all_text
+
+    for slide, slide_plan in zip(generated.slides, plan_payload["slides"]):
+        slide_texts = _slide_texts(slide)
+        assert slide_plan["title"] in slide_texts
+        if slide_plan["bullets"]:
+            for bullet in slide_plan["bullets"]:
+                assert any(bullet in text for text in slide_texts)
+
+        has_native_text = bool(slide_texts)
+        has_picture = any(shape.shape_type == MSO_SHAPE_TYPE.PICTURE for shape in slide.shapes)
+        assert has_native_text
+        assert not (has_picture and not has_native_text)
+
+    source_map_payload = json.loads(source_map.read_text(encoding="utf-8"))
+    assert source_map_payload["title"] == plan_payload["title"]
+    assert len(source_map_payload["slides"]) == len(plan_payload["slides"])
+    assert all(
+        set(slide_entry) >= {"slide_number", "title", "sources"}
+        for slide_entry in source_map_payload["slides"]
+    )
+    resolved_sources = [
+        source
+        for slide_entry in source_map_payload["slides"]
+        for source in slide_entry["sources"]
+        if source.get("resolved")
+    ]
+    assert resolved_sources
+    assert any(source["relative_path"] == "history.pptx" for source in resolved_sources)
+    assert any(str(source.get("location", "")).startswith("slide ") for source in resolved_sources)
