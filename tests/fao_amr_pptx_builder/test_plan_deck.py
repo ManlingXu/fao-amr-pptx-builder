@@ -62,7 +62,7 @@ def test_plan_deck_excludes_extraction_warning_from_content_slide_sources():
     content_slide_sources = [
         source_id
         for slide in plan["slides"]
-        if slide["layout"] != "title"
+        if slide["layout"] == "content"
         for source_id in slide["source_ids"]
     ]
 
