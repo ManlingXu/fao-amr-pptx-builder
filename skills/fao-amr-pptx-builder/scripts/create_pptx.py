@@ -12,6 +12,31 @@ def _source_lookup(index: list[dict]) -> dict[str, dict]:
     return {item["source_id"]: item for item in index if item.get("source_id")}
 
 
+def _remove_all_slides(prs: Presentation) -> None:
+    # Keep the template's theme and layouts, but remove any sample content slides.
+    for slide_id in list(prs.slides._sldIdLst):
+        prs.part.drop_rel(slide_id.rId)
+        prs.slides._sldIdLst.remove(slide_id)
+
+
+def _resolve_source(source_id: str, sources: dict[str, dict]) -> dict:
+    source = sources.get(source_id)
+    if source is None:
+        return {
+            "source_id": source_id,
+            "relative_path": "UNRESOLVED",
+            "location": "missing from source_index",
+            "resolved": False,
+        }
+
+    return {
+        "source_id": source_id,
+        "relative_path": source["relative_path"],
+        "location": source["location"],
+        "resolved": True,
+    }
+
+
 def _add_title_slide(prs: Presentation, title: str) -> None:
     layout = prs.slide_layouts[0] if len(prs.slide_layouts) > 0 else prs.slide_layouts[6]
     slide = prs.slides.add_slide(layout)
@@ -51,12 +76,10 @@ def _add_content_slide(prs: Presentation, slide_plan: dict, sources: dict[str, d
         paragraph.level = 0
         paragraph.font.size = Pt(24)
 
-    note_lines = []
-    for source_id in slide_plan.get("source_ids", []):
-        source = sources.get(source_id)
-        if source is None:
-            continue
-        note_lines.append(f"{source_id}: {source['relative_path']} ({source['location']})")
+    note_lines = [
+        f"{entry['source_id']}: {entry['relative_path']} ({entry['location']})"
+        for entry in (_resolve_source(source_id, sources) for source_id in slide_plan.get("source_ids", []))
+    ]
     if note_lines:
         slide.notes_slide.notes_text_frame.text = "\n".join(note_lines)
 
@@ -64,18 +87,7 @@ def _add_content_slide(prs: Presentation, slide_plan: dict, sources: dict[str, d
 def _write_source_map(plan: dict, sources: dict[str, dict], source_map: Path) -> None:
     payload = {"title": plan.get("title", "Deck"), "slides": []}
     for slide in plan.get("slides", []):
-        slide_sources = []
-        for source_id in slide.get("source_ids", []):
-            source = sources.get(source_id)
-            if source is None:
-                continue
-            slide_sources.append(
-                {
-                    "source_id": source_id,
-                    "relative_path": source["relative_path"],
-                    "location": source["location"],
-                }
-            )
+        slide_sources = [_resolve_source(source_id, sources) for source_id in slide.get("source_ids", [])]
         payload["slides"].append(
             {
                 "slide_number": slide["slide_number"],
@@ -96,6 +108,8 @@ def create_pptx(
     source_map: Path | None = None,
 ) -> None:
     prs = Presentation(str(template)) if template else Presentation()
+    if template:
+        _remove_all_slides(prs)
     sources = _source_lookup(index)
 
     for slide in plan.get("slides", []):
