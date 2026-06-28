@@ -104,15 +104,19 @@ def _evidence_score(text: str, query: str) -> int:
 
 
 def _has_strong_fao_amr_signal(source_item: dict) -> bool:
-    searchable = " ".join(
+    text = str(source_item.get("text", "")).lower()
+    provenance = " ".join(
         str(source_item.get(field, ""))
-        for field in ("text", "relative_path", "source_id", "url", "source_url", "domain")
+        for field in ("url", "source_url", "domain")
     ).lower()
-    terms = _terms(searchable)
+    terms = _terms(text)
+    has_core_amr_text = bool(
+        {"amr", "antimicrobial", "resistance"} & terms
+        or any(phrase in text for phrase in STRONG_FAO_AMR_PHRASES)
+    )
     return bool(
-        terms & STRONG_FAO_AMR_SIGNALS
-        or any(phrase in searchable for phrase in STRONG_FAO_AMR_PHRASES)
-        or "fao.org" in searchable
+        has_core_amr_text
+        or (("fao.org" in provenance or "fao" in terms) and bool(terms & (STRONG_FAO_AMR_SIGNALS - {"fao"})))
     )
 
 
@@ -298,7 +302,7 @@ def plan_deck(prompt: str, index: list[dict], max_slides: int = 11) -> dict:
                 "speaker_notes": "",
                 "source_ids": []
                 if is_title
-                else _select_sources(index, slide_title, allow_warning=allow_warning_sources)
+                else _select_sources(usable_index, slide_title, allow_warning=allow_warning_sources)
                 if is_sources_layout
                 else _source_ids_for_bullets(slide_title, usable_index),
             }

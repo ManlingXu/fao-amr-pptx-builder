@@ -145,6 +145,53 @@ def test_plan_deck_returns_evidence_gap_plan_for_generic_admin_action_plan_text(
     assert all("src001" not in slide["source_ids"] for slide in content_slides)
 
 
+def test_plan_deck_returns_evidence_gap_for_generic_admin_text_in_fao_path():
+    index = [
+        {
+            "source_id": "src001",
+            "text": (
+                "The country office action plan improves food safety and health service use "
+                "for staff meetings."
+            ),
+            "relative_path": "FAO/admin.txt",
+            "location": "document",
+            "kind": "document",
+        }
+    ]
+
+    module = load_module()
+    plan = module.plan_deck("give me a PPT of AMR history in FAO", index)
+
+    assert plan["title"] == "Evidence gap: AMR history in FAO"
+    assert all("src001" not in slide["source_ids"] for slide in plan["slides"])
+
+
+def test_plan_deck_sources_slide_uses_only_gated_usable_sources():
+    index = [
+        {
+            "source_id": "good",
+            "text": "FAO AMR surveillance supports governance of antimicrobial resistance in agrifood systems.",
+            "relative_path": "history.pptx",
+            "location": "slide 1",
+            "kind": "presentation",
+        },
+        {
+            "source_id": "admin",
+            "text": "The country office action plan improves food safety and health service use for staff meetings.",
+            "relative_path": "FAO/admin.txt",
+            "location": "document",
+            "kind": "document",
+        },
+    ]
+
+    module = load_module()
+    plan = module.plan_deck("give me a PPT of AMR history in FAO", index)
+
+    sources_slide = next(slide for slide in plan["slides"] if slide["layout"] == "sources")
+    assert "good" in sources_slide["source_ids"]
+    assert "admin" not in sources_slide["source_ids"]
+
+
 def test_plan_deck_excludes_extraction_warning_from_content_slide_sources():
     index = [
         {
