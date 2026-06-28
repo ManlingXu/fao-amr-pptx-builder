@@ -96,6 +96,13 @@ def test_end_to_end_workflow_creates_editable_pptx(tmp_path):
         set(slide_entry) >= {"slide_number", "title", "sources"}
         for slide_entry in source_map_payload["slides"]
     )
+    source_map_slides = source_map_payload["slides"]
+    for slide_plan, slide_entry in zip(plan_payload["slides"], source_map_slides):
+        assert slide_entry["slide_number"] == slide_plan["slide_number"]
+        assert slide_entry["title"] == slide_plan["title"]
+        assert [source["source_id"] for source in slide_entry["sources"]] == slide_plan["source_ids"]
+        assert all(source.get("resolved") is True for source in slide_entry["sources"])
+
     resolved_sources = [
         source
         for slide_entry in source_map_payload["slides"]
