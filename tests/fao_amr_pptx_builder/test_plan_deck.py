@@ -38,3 +38,33 @@ def test_plan_deck_creates_history_outline_with_sources():
     assert any("Key milestones" in slide["title"] for slide in plan["slides"])
     content_slides = [slide for slide in plan["slides"] if slide["layout"] != "title"]
     assert any(slide["source_ids"] for slide in content_slides)
+
+
+def test_plan_deck_excludes_extraction_warning_from_content_slide_sources():
+    index = [
+        {
+            "source_id": "normal-1",
+            "text": "FAO AMR history includes regional action plans and governance milestones.",
+            "relative_path": "history.pdf",
+            "location": "slide 1",
+        },
+        {
+            "source_id": "warning-1",
+            "text": "FAO AMR extraction warning with partial text for slide reconstruction.",
+            "relative_path": "history.pdf",
+            "location": "extraction warning",
+        },
+    ]
+
+    module = load_module()
+    plan = module.plan_deck("give me a PPT of AMR history in FAO", index)
+
+    content_slide_sources = [
+        source_id
+        for slide in plan["slides"]
+        if slide["layout"] != "title"
+        for source_id in slide["source_ids"]
+    ]
+
+    assert "warning-1" not in content_slide_sources
+    assert "normal-1" in content_slide_sources
