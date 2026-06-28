@@ -8,6 +8,30 @@ The skill lives at:
 skills/fao-amr-pptx-builder/
 ```
 
+## Current Status
+
+This is a working v1 Codex skill. It can be installed into another Codex setup and used to generate editable `.pptx` drafts, as long as the receiving environment has:
+
+- Access to this private GitHub repository.
+- Python 3.10 or newer.
+- The Python dependencies in `pyproject.toml`.
+- A local folder containing the FAO AMR materials, such as a OneDrive-synced folder.
+- A PowerPoint template file when template-based output is desired.
+
+The skill does not include FAO source materials or templates. Users provide those at generation time.
+
+## Install In Codex
+
+Ask Codex to install the skill from this repository path:
+
+```text
+Install the Codex skill from https://github.com/ManlingXu/fao-amr-pptx-builder/tree/main/skills/fao-amr-pptx-builder
+```
+
+For private-repo installs, the target machine must already have GitHub access through an authenticated browser, Git credentials, or `GITHUB_TOKEN` / `GH_TOKEN`.
+
+After installation, restart Codex so the new skill is discovered.
+
 It is designed for prompts such as:
 
 ```text
@@ -43,11 +67,19 @@ Do not commit real FAO source materials to this repository. Point the workflow a
 
 Supported input formats include `.pptx`, `.pdf`, `.docx`, `.txt`, `.md`, and `.html`, depending on installed optional Python packages.
 
+## V1 Limits
+
+- The skill uses local files only; it does not call Microsoft Graph or pull directly from OneDrive cloud URLs.
+- Complex legacy slide designs are rebuilt into editable text/shapes using the chosen template rather than copied pixel-perfectly.
+- Charts and figures from reports are not automatically redrawn as fully editable charts in v1; the source map points back to the relevant materials.
+
 ## Validation
 
 Run the focused tests and skill validation with:
 
 ```powershell
-python -m pytest tests\fao_amr_pptx_builder tests\test_retrieval.py -v
-python "C:\Users\徐曼灵\.codex\skills\.system\skill-creator\scripts\quick_validate.py" skills\fao-amr-pptx-builder
+python -m pip install -e .[dev]
+python -m pytest tests\fao_amr_pptx_builder -v
 ```
+
+When developing inside Codex, also run the local `skill-creator` quick validation script against `skills\fao-amr-pptx-builder`.
