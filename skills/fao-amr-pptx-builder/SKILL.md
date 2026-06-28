@@ -15,7 +15,7 @@ Create editable FAO AMR PowerPoint drafts from a OneDrive-synced materials folde
 4. Run `scripts/scan_sources.py` to create `sources.json`.
 5. Run `scripts/build_source_index.py` to create `source_index.json`.
 6. Run `scripts/plan_deck.py` to create `deck_plan.json`.
-7. Run `scripts/create_pptx.py` to create `draft.pptx` and `source_map.md`.
+7. Run `scripts/create_pptx.py` to create `draft.pptx` and `source_map.json`.
 8. Return the PPTX path, source map path, and a concise note about evidence coverage.
 
 ## Defaults
@@ -28,7 +28,7 @@ Create editable FAO AMR PowerPoint drafts from a OneDrive-synced materials folde
 
 ## Revision
 
-For review requests, use `scripts/revise_deck.py` with the prior `deck_plan.json`, `source_index.json`, and review instruction, then regenerate the PPTX.
+For review requests, use `scripts/revise_deck.py` with the prior `deck_plan.json`, `source_index.json`, `source_map.json`, and review instruction, then regenerate the PPTX.
 
 ## References
 

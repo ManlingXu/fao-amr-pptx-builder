@@ -161,7 +161,7 @@ Create editable FAO AMR PowerPoint drafts from a OneDrive-synced materials folde
 4. Run `scripts/scan_sources.py` to create `sources.json`.
 5. Run `scripts/build_source_index.py` to create `source_index.json`.
 6. Run `scripts/plan_deck.py` to create `deck_plan.json`.
-7. Run `scripts/create_pptx.py` to create `draft.pptx` and `source_map.md`.
+7. Run `scripts/create_pptx.py` to create `draft.pptx` and `source_map.json`.
 8. Return the PPTX path, source map path, and a concise note about evidence coverage.
 
 ## Defaults
@@ -174,7 +174,7 @@ Create editable FAO AMR PowerPoint drafts from a OneDrive-synced materials folde
 
 ## Revision
 
-For review requests, use `scripts/revise_deck.py` with the prior `deck_plan.json`, `source_index.json`, and review instruction, then regenerate the PPTX.
+For review requests, use `scripts/revise_deck.py` with the prior `deck_plan.json`, `source_index.json`, `source_map.json`, and review instruction, then regenerate the PPTX.
 
 ## References
 
@@ -791,7 +791,7 @@ git commit -m "Add FAO AMR deck planner"
 **Interfaces:**
 - Consumes: `deck_plan.json`, `source_index.json`, optional `template.pptx`
 - Produces: `create_pptx(plan: dict, index: list[dict], output: Path, template: Path | None = None, source_map: Path | None = None) -> None`
-- Produces CLI: `python create_pptx.py --plan deck_plan.json --index source_index.json --template template.pptx --output draft.pptx --source-map source_map.md`
+- Produces CLI: `python create_pptx.py --plan deck_plan.json --index source_index.json --template template.pptx --output draft.pptx --source-map source_map.json`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -825,7 +825,7 @@ def test_create_pptx_writes_editable_deck_and_source_map(tmp_path):
     }
     index = [{"source_id": "src001", "relative_path": "history.pptx", "location": "slide 3", "text": "Food and agriculture relevance"}]
     output = tmp_path / "draft.pptx"
-    source_map = tmp_path / "source_map.md"
+    source_map = tmp_path / "source_map.json"
 
     module = load_module()
     module.create_pptx(plan, index, output, source_map=source_map)
@@ -836,7 +836,8 @@ def test_create_pptx_writes_editable_deck_and_source_map(tmp_path):
     assert len(prs.slides) == 2
     slide_text = "\n".join(shape.text for shape in prs.slides[1].shapes if hasattr(shape, "text"))
     assert "Food and agriculture relevance" in slide_text
-    assert "history.pptx" in source_map.read_text(encoding="utf-8")
+    source_map_data = json.loads(source_map.read_text(encoding="utf-8"))
+    assert source_map_data["slides"][1]["sources"][0]["relative_path"] == "history.pptx"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -861,6 +862,7 @@ import json
 from pathlib import Path
 
 from pptx import Presentation
+import json
 from pptx.util import Inches, Pt
 
 
@@ -914,19 +916,28 @@ def _add_content_slide(prs: Presentation, slide_plan: dict, sources: dict[str, d
 
 
 def _write_source_map(plan: dict, sources: dict[str, dict], source_map: Path) -> None:
-    lines = [f"# Source Map: {plan.get('title', 'Deck')}", ""]
+    payload = {"title": plan.get("title", "Deck"), "slides": []}
     for slide in plan.get("slides", []):
-        lines.append(f"## Slide {slide['slide_number']}: {slide['title']}")
-        source_ids = slide.get("source_ids", [])
-        if not source_ids:
-            lines.append("- No source assigned")
-        for source_id in source_ids:
+        slide_sources = []
+        for source_id in slide.get("source_ids", []):
             source = sources.get(source_id)
             if source:
-                lines.append(f"- `{source_id}` {source['relative_path']} - {source['location']}")
-        lines.append("")
+                slide_sources.append(
+                    {
+                        "source_id": source_id,
+                        "relative_path": source["relative_path"],
+                        "location": source["location"],
+                    }
+                )
+        payload["slides"].append(
+            {
+                "slide_number": slide["slide_number"],
+                "title": slide["title"],
+                "sources": slide_sources,
+            }
+        )
     source_map.parent.mkdir(parents=True, exist_ok=True)
-    source_map.write_text("\n".join(lines), encoding="utf-8")
+    source_map.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def create_pptx(plan: dict, index: list[dict], output: Path, template: Path | None = None, source_map: Path | None = None) -> None:
@@ -1170,7 +1181,7 @@ def test_end_to_end_workflow_creates_editable_pptx(tmp_path):
     index = tmp_path / "source_index.json"
     plan = tmp_path / "deck_plan.json"
     output = tmp_path / "draft.pptx"
-    source_map = tmp_path / "source_map.md"
+    source_map = tmp_path / "source_map.json"
 
     subprocess.run([sys.executable, str(SCAN), "--source-folder", str(materials), "--output", str(sources)], check=True)
     subprocess.run([sys.executable, str(INDEX), "--sources", str(sources), "--output", str(index)], check=True)
@@ -1215,7 +1226,7 @@ The generated output includes:
 
 - `draft.pptx` - editable PowerPoint deck
 - `deck_plan.json` - slide-by-slide plan
-- `source_map.md` - source traceability per slide
+- `source_map.json` - source traceability per slide
 ```
 
 - [ ] **Step 4: Run all relevant tests**
@@ -1268,4 +1279,4 @@ Expected:
 
 - Spec coverage: OneDrive-synced folder, supplied template, reusable previous PPTs, reports, JSON artifacts, editable PPTX, source map, and revision workflow are covered.
 - Placeholder scan: no unfinished marker terms or vague deferred-work tasks are intentionally included.
-- Type consistency: source scan, index, plan, PPTX creation, and revision all use the shared `source_id`, `slides`, `source_ids`, and JSON artifact names defined above.
+- Type consistency: source scan, index, plan, PPTX creation, revision, and source map all use the shared `source_id`, `slides`, `source_ids`, and JSON artifact names defined above.
