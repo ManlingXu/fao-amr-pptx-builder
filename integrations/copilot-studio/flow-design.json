@@ -1,0 +1,88 @@
+{
+  "type": "configuration-blueprint",
+  "importableSolution": false,
+  "version": "1.0",
+  "topic": "Create a draft from existing slides",
+  "steps": [
+    {
+      "id": "collect",
+      "kind": "question",
+      "inputs": [
+        "topic",
+        "audience",
+        "purpose",
+        "slideCount",
+        "reportingPeriod"
+      ]
+    },
+    {
+      "id": "search",
+      "kind": "tool",
+      "operationId": "SearchSlides",
+      "input": {
+        "query": "keywords from collected request",
+        "limit": 15,
+        "latest_only": true
+      }
+    },
+    {
+      "id": "review_versions",
+      "kind": "conditional-tool",
+      "when": "A reporting-date or source-version conflict needs inspection",
+      "operationId": "GetSlideVersions",
+      "input": {
+        "slide_id": "exact candidate slideId"
+      },
+      "content": "Show related versions and date evidence; keep uncertainty visible before selection."
+    },
+    {
+      "id": "select",
+      "kind": "message",
+      "content": "Show ordered candidates with source deck, original slide number, reportDate or uncertainty, dateReason, source URL and selection reason."
+    },
+    {
+      "id": "confirm",
+      "kind": "question",
+      "required": "Explicit confirmation of the selected slide IDs and order.",
+      "onNo": "select"
+    },
+    {
+      "id": "create",
+      "kind": "tool",
+      "operationId": "CreateDraft",
+      "input": {
+        "slide_ids": "confirmed ordered unique IDs",
+        "confirmed": true,
+        "title": "user title"
+      }
+    },
+    {
+      "id": "status",
+      "kind": "tool",
+      "operationId": "GetDraftStatus",
+      "input": {
+        "job_id": "create.jobId"
+      },
+      "onPending": "Tell user still processing; check again on request.",
+      "onFailed": "Show safe error and remedy"
+    },
+    {
+      "id": "deliver",
+      "kind": "message",
+      "content": "Only when completed, return webUrl plus relevant warnings and source map."
+    }
+  ],
+  "notes": [
+    "Direct custom connector is the default; Agent flow wrapper is optional.",
+    "No automatic push notification is implemented.",
+    "Do not interpret an installation link as permission to use an agent or its source library."
+  ],
+  "toolConfiguration": {
+    "CreateDraft": {
+      "allowDynamicUse": false,
+      "askEndUserBeforeRunning": true,
+      "inputBinding": "Use confirmed topic variables, not AI-filled confirmation."
+    },
+    "organizationalAuthentication": "End user"
+  }
+}

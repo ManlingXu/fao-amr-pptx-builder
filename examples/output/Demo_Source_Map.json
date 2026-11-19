@@ -1,0 +1,41 @@
+[
+  {
+    "outputSlide": 1,
+    "slideId": "a82bd5455c6397522fd57138",
+    "deckName": "AMR_Global_Update_2026.pptx",
+    "slideNumber": 1,
+    "title": "AMR surveillance in Africa",
+    "url": "/api/slides/a82bd5455c6397522fd57138/source",
+    "reportDate": "2025",
+    "effectiveYear": 2025,
+    "dateConfidence": 1.0,
+    "dateReason": "explicit data period (Data through 2025)",
+    "sourceHash": "d984c258a4f0d2579a1cf900811c0a63d5e9b5dcde79f4db5ee651025b5eabbf"
+  },
+  {
+    "outputSlide": 2,
+    "slideId": "366fa4ee4ec2a171423ed551",
+    "deckName": "AMR_Global_Update_2026.pptx",
+    "slideNumber": 2,
+    "title": "Key AMR drivers",
+    "url": "/api/slides/366fa4ee4ec2a171423ed551/source",
+    "reportDate": "2025",
+    "effectiveYear": 2025,
+    "dateConfidence": 1.0,
+    "dateReason": "explicit data period (Data through 2025)",
+    "sourceHash": "d984c258a4f0d2579a1cf900811c0a63d5e9b5dcde79f4db5ee651025b5eabbf"
+  },
+  {
+    "outputSlide": 3,
+    "slideId": "0139e7d45c90d3a170bcee02",
+    "deckName": "One_Health_Methodology.pptx",
+    "slideNumber": 1,
+    "title": "One Health analytical framework",
+    "url": "/api/slides/0139e7d45c90d3a170bcee02/source",
+    "reportDate": null,
+    "effectiveYear": null,
+    "dateConfidence": 0.0,
+    "dateReason": "date unknown",
+    "sourceHash": "b6d1d4015bff18d00a5c493574b1c1ea3e3d042cce5ad3a71a6158c13dd6b755"
+  }
+]

@@ -1,0 +1,106 @@
+"""Export a Swagger 2 custom connector for the implemented tool API."""
+from __future__ import annotations
+import argparse
+import json
+from pathlib import Path
+from urllib.parse import urlsplit
+from uuid import UUID
+
+def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> dict:
+    url = urlsplit(base_url)
+    if url.scheme != "https" or not url.hostname or url.username or url.password or url.query or url.fragment:
+        raise ValueError("Use an HTTPS service base URL without credentials, query or fragment.")
+    if auth not in {"api-key", "entra"}:
+        raise ValueError("auth must be api-key or entra")
+    slide = {"type": "object", "properties": {
+        "slideId": {"type":"string"}, "deckName":{"type":"string"},
+        "slideNumber":{"type":"integer"}, "title":{"type":"string"},
+        "snippet":{"type":"string"}, "url":{"type":"string"},
+        "effectiveYear":{"type":"integer","x-nullable":True},
+        "reportDate":{"type":"string","x-nullable":True},
+        "dateConfidence":{"type":"number"}, "dateReason":{"type":"string"},
+        "sourceHash":{"type":"string"}, "freshness":{"type":"string"},
+        "relatedVersions":{"type":"integer"}, "explanation":{"type":"array","items":{"type":"string"}}
+    }}
+    provenance = {"type":"object","properties":{
+        "outputSlide":{"type":"integer"}, "slideId":{"type":"string"},
+        "deckName":{"type":"string"}, "slideNumber":{"type":"integer"},
+        "title":{"type":"string"}, "url":{"type":"string"},
+        "reportDate":{"type":"string","x-nullable":True},
+        "effectiveYear":{"type":"integer","x-nullable":True},
+        "dateConfidence":{"type":"number"}, "dateReason":{"type":"string"},
+        "sourceHash":{"type":"string"}
+    }}
+    job = {"type":"object","properties":{
+        "jobId":{"type":"string"}, "status":{"type":"string","enum":["queued","running","completed","failed"]},
+        "statusUrl":{"type":"string"}, "title":{"type":"string"},
+        "downloadUrl":{"type":"string","x-nullable":True},
+        "webUrl":{"type":"string","x-nullable":True}, "error":{"type":"string","x-nullable":True},
+        "warnings":{"type":"array","items":{"type":"string"}},
+        "sourceMap":{"type":"array","items":{"$ref":"#/definitions/SourceMapEntry"}}
+    }}
+    if auth == "api-key":
+        security = {"ApiKey":{"type":"apiKey","in":"header","name":"X-API-Key"}}
+        requirement = [{"ApiKey":[]}]
+    else:
+        UUID(tenant_id); UUID(api_app_id)
+        scope = "api://" + api_app_id + "/access_as_user"
+        security = {"EntraOAuth":{
+            "type":"oauth2","flow":"accessCode",
+            "authorizationUrl":"https://login.microsoftonline.com/" + tenant_id + "/oauth2/v2.0/authorize",
+            "tokenUrl":"https://login.microsoftonline.com/" + tenant_id + "/oauth2/v2.0/token",
+            "scopes":{scope:"Use the approved Presentation Assistant API as the signed-in user",
+                      "offline_access":"Maintain the signed-in connector connection with refresh tokens"}
+        }}
+        requirement = [{"EntraOAuth":[scope,"offline_access"]}]
+    error = {"description":"Request rejected or operation failed","schema":{"type":"object"}}
+    def operation(operation_id, summary, parameters, schema, status="200"):
+        return {"operationId":operation_id,"summary":summary,"x-ms-summary":summary,
+                "description":summary,"parameters":parameters,
+                "responses":{status:{"description":"Success","schema":schema},"default":error}}
+    search_request = {"type":"object","required":["query"],"properties":{
+        "query":{"type":"string","minLength":1,"maxLength":1000},
+        "limit":{"type":"integer","minimum":1,"maximum":15,"default":15},
+        "latest_only":{"type":"boolean","default":True}
+    }}
+    draft_request = {"type":"object","required":["title","slide_ids","confirmed"],"properties":{
+        "title":{"type":"string","minLength":1,"maxLength":120},
+        "slide_ids":{"type":"array","minItems":1,"maxItems":20,"uniqueItems":True,"items":{"type":"string","minLength":1,"maxLength":128}},
+        "confirmed":{"type":"boolean","enum":[True],"description":"True only after the user explicitly approves the ordered selection"}
+    }}
+    body=lambda schema:[{"name":"body","in":"body","required":True,"schema":schema}]
+    path=lambda name:[{"name":name,"in":"path","required":True,"type":"string"}]
+    return {
+      "swagger":"2.0","info":{"title":"Presentation Assistant","version":"1.0.0",
+      "description":"Search existing slides, confirm selection, create and retrieve editable drafts."},
+      "host":url.netloc,"basePath":url.path.rstrip("/") or "/","schemes":["https"],
+      "consumes":["application/json"],"produces":["application/json"],
+      "securityDefinitions":security,"security":requirement,
+      "paths":{
+        "/api/search":{"post":operation("SearchSlides","Search approved source slides",body(search_request),
+          {"type":"object","properties":{"query":{"type":"string"},"results":{"type":"array","items":{"$ref":"#/definitions/Slide"}}}})},
+        "/api/slides/{slide_id}/versions":{"get":operation("GetSlideVersions","Inspect related source versions",path("slide_id"),
+          {"type":"object","properties":{"slideId":{"type":"string"},"versions":{"type":"array","items":{"$ref":"#/definitions/Slide"}}}})},
+        "/api/drafts":{"post":operation("CreateDraft","Create a draft after user confirmation",body(draft_request),{"$ref":"#/definitions/Job"},"202")},
+        "/api/drafts/{job_id}":{"get":operation("GetDraftStatus","Check draft status and file link",path("job_id"),{"$ref":"#/definitions/Job"})}
+      },
+      "definitions":{"Slide":slide,"SourceMapEntry":provenance,"Job":job}
+    }
+
+def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--base-url",default="https://api.example.invalid")
+    parser.add_argument("--auth",choices=["api-key","entra"],default="api-key")
+    parser.add_argument("--tenant-id",default="00000000-0000-0000-0000-000000000000")
+    parser.add_argument("--api-app-id",default="00000000-0000-0000-0000-000000000000")
+    parser.add_argument("--output",type=Path,required=True)
+    args=parser.parse_args()
+    data=specification(args.base_url,args.auth,args.tenant_id,args.api_app_id)
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    args.output.write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    print("Wrote",args.output)
+    if ".invalid" in data["host"]:
+        print("Template host only: regenerate with the CSI-approved HTTPS address before import.")
+
+if __name__=="__main__":
+    main()

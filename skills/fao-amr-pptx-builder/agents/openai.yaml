@@ -1,4 +1,0 @@
-interface:
-  display_name: "FAO AMR PPTX Builder"
-  short_description: "Editable FAO AMR decks from sources."
-  default_prompt: "Create an editable FAO AMR PowerPoint deck from my OneDrive materials and supplied template."

@@ -1,0 +1,18 @@
+services:
+  ppt-assistant:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    environment:
+      AUTH_MODE: api_key
+      LOCAL_PRESENTATION_PATH: /app/sources
+      DRAFTS_PATH: /app/state/drafts
+      SHAREPOINT_CACHE_PATH: /app/state/sharepoint-cache
+    volumes:
+      - ./data/presentations:/app/sources:ro
+      - ppt_state:/app/state
+    restart: unless-stopped
+volumes:
+  ppt_state:

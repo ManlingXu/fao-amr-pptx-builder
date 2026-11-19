@@ -1,97 +1,62 @@
-# FAO AMR PPTX Builder Skill
+# Teams PowerPoint Assistant
 
-This repository contains a shareable Codex skill for creating editable first-draft PowerPoint decks from FAO AMR source materials.
+Find approved existing slides, review sources and reporting dates, confirm the slide order, and assemble an editable draft for Teams.
 
-## Start Here
+**中文：** 从批准的共享 PPTX 中选页，核对来源、版本和数据时间；用户确认顺序后保留原页格式生成可编辑初稿，并返回有访问权限控制的 SharePoint 链接。
 
-- New users: read [docs/USER_MANUAL.md](docs/USER_MANUAL.md).
-- Repository owners: read [docs/SHARING_CHECKLIST.md](docs/SHARING_CHECKLIST.md).
-- Codex skill files: see `skills/fao-amr-pptx-builder/`.
+[中文开始](docs/START_HERE_CN.md) · [Start here](docs/START_HERE_EN.md) · [Copilot setup](docs/COPILOT_STUDIO_EN.md) · [CSI handoff](docs/CSI_HANDOFF_EN.md)
 
-The skill lives at:
+## One workflow
 
-```text
-skills/fao-amr-pptx-builder/
+1. **Understand:** Copilot Studio supplies the conversational LLM and collects the request.
+2. **Search and review:** the backend searches approved PPTX slides and returns the source deck, slide number, reporting date and date evidence. Related versions are available for review.
+3. **Confirm:** the user approves the exact slides and their order before creation.
+4. **Assemble:** the backend rechecks source files and copies supported original slides and dependencies into a draft, retaining native editable content and source formatting.
+5. **Deliver:** Copilot checks the job result and returns its authenticated SharePoint link, warnings and source map.
+
+This version has no new factual-slide generation, template redesign, PDF/DOCX ingestion, separate chat UI, vector search or additional backend LLM. The local API demonstration uses synthetic content and does not provide a Copilot conversation.
+
+## Try locally
+
+Use Python 3.11 or later. From the repository root on macOS/Linux:
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install -e ".[test]"
+.venv/bin/python -m pytest
+.venv/bin/python scripts/run_demo.py
 ```
 
-## Current Status
+On Windows, substitute `.venv/Scripts/python.exe` for `.venv/bin/python`. The demo saves a three-slide draft and provenance in `examples/output/`. It calls no Microsoft service or model. All included sample decks are synthetic; they are not FAO evidence.
 
-This is a working v1 Codex skill. It can be installed into another Codex setup and used to generate editable `.pptx` drafts, as long as the receiving environment has:
+For the local API, run `start-local.cmd` on Windows or `bash start-local.sh` on macOS/Linux, then open <http://127.0.0.1:8000/docs>.
 
-- Access to this private GitHub repository.
-- Python 3.10 or newer.
-- The Python dependencies in `requirements.txt` or `pyproject.toml`.
-- A local folder containing the FAO AMR materials, such as a OneDrive-synced folder.
-- A PowerPoint template file when template-based output is desired.
+## Connect the four tools
 
-The skill does not include FAO source materials or templates. Users provide those at generation time.
+| Copilot tool | Purpose |
+|---|---|
+| `SearchSlides` | Find candidates with source and date evidence |
+| `GetSlideVersions` | Review related source versions |
+| `CreateDraft` | Submit explicitly confirmed, ordered slide IDs |
+| `GetDraftStatus` | Retrieve progress and the completed result |
 
-## Install In Codex
+Production uses Entra user authentication and a separately authorized Graph service identity. The API-key definition is for a local or controlled pilot. `flow-design.json` is a configuration blueprint, not an importable agent or solution. Follow the [Chinese](docs/COPILOT_STUDIO_CN.md) or [English](docs/COPILOT_STUDIO_EN.md) setup guide.
 
-Ask Codex to install the skill from this repository path:
+## Operating boundary
 
-```text
-Install the Codex skill from https://github.com/ManlingXu/fao-amr-pptx-builder/tree/main/skills/fao-amr-pptx-builder
-```
+The pilot uses one approved source library whose entire contents are accessible to the same authorized audience. App-only Graph indexing does not apply each user's individual SharePoint file permissions. Entra scopes API job access to the requester; saved output files follow the destination folder's SharePoint permissions. API-key users share one identity.
 
-For private-repo installs, the target machine must already have GitHub access through an authenticated browser, Git credentials, or `GITHUB_TOKEN` / `GH_TOKEN`.
+Run one service process on one instance with persistent storage. Dates and version grouping contain heuristics; supported native slides retain their formatting, but representative files still need final PowerPoint checks. See [acceptance](docs/ACCEPTANCE.md) and [verification](docs/VERIFICATION.md).
 
-After installation, restart Codex so the new skill is discovered.
+Live tenant OAuth, Graph grants, hosting, connector import and Teams publication require CSI configuration and validation. Use [`.env.production.example`](.env.production.example), the [CSI handoff](docs/CSI_HANDOFF_EN.md) and [deployment guide](deploy/README.md).
 
-Install Python dependencies with:
+## Repository map
 
-```powershell
-python -m pip install -r requirements.txt
-```
-
-It is designed for prompts such as:
-
-```text
-Use the FAO AMR PPTX builder to give me a PPT of AMR history in FAO using this template and the materials in my local OneDrive AMR folder.
-```
-
-For v1, OneDrive materials must be available as a synced local folder. The skill does not connect directly to Microsoft Graph or OneDrive cloud APIs.
-
-## What It Produces
-
-- `draft.pptx` - editable PowerPoint deck
-- `deck_plan.json` - slide-by-slide plan
-- `source_map.json` - source traceability per slide
-
-If the indexed materials do not contain relevant non-warning evidence, the planner creates a short evidence-gap deck plan instead of pretending to have a sourced full deck.
-
-## Manual Script Workflow
-
-From the repository root:
-
-```powershell
-python skills\fao-amr-pptx-builder\scripts\scan_sources.py --source-folder "C:\path\to\OneDrive AMR Materials" --output outputs\fao-amr-pptx\sources.json
-python skills\fao-amr-pptx-builder\scripts\build_source_index.py --sources outputs\fao-amr-pptx\sources.json --output outputs\fao-amr-pptx\source_index.json
-python skills\fao-amr-pptx-builder\scripts\plan_deck.py --prompt "give me a PPT of AMR history in FAO" --index outputs\fao-amr-pptx\source_index.json --output outputs\fao-amr-pptx\deck_plan.json
-python skills\fao-amr-pptx-builder\scripts\create_pptx.py --plan outputs\fao-amr-pptx\deck_plan.json --index outputs\fao-amr-pptx\source_index.json --template "C:\path\to\template.pptx" --output outputs\fao-amr-pptx\draft.pptx --source-map outputs\fao-amr-pptx\source_map.json
-```
-
-The template argument is optional; when omitted, the generator uses a clean editable default PowerPoint layout.
-
-## Source Materials
-
-Do not commit real FAO source materials to this repository. Point the workflow at a local folder containing approved materials, such as synced OneDrive files, when generating a deck.
-
-Supported input formats include `.pptx`, `.pdf`, `.docx`, `.txt`, `.md`, and `.html`, depending on installed optional Python packages.
-
-## V1 Limits
-
-- The skill uses local files only; it does not call Microsoft Graph or pull directly from OneDrive cloud URLs.
-- Complex legacy slide designs are rebuilt into editable text/shapes using the chosen template rather than copied pixel-perfectly.
-- Charts and figures from reports are not automatically redrawn as fully editable charts in v1; the source map points back to the relevant materials.
-
-## Validation
-
-Run the focused tests and skill validation with:
-
-```powershell
-python -m pip install -e .[dev]
-python -m pytest tests\fao_amr_pptx_builder -v
-```
-
-When developing inside Codex, also run the local `skill-creator` quick validation script against `skills\fao-amr-pptx-builder`.
+| Path | Contents |
+|---|---|
+| `presentation_search/` | Search, dates, identity, jobs, original-slide assembly and SharePoint provider |
+| `integrations/copilot-studio/` | Two connector templates, instructions and configuration blueprint |
+| `scripts/`, `deploy/` | Local run, connector export, packaging and host setup |
+| `data/presentations/`, `examples/output/` | Synthetic sources and demo result |
+| `docs/`, `tests/` | Bilingual setup, acceptance and focused regression tests |
+| `.github/workflows/tests.yml` | Proposed test-only CI; no deployment or tenant credentials |

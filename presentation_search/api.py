@@ -1,0 +1,206 @@
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from threading import Lock
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi.responses import FileResponse
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StringConstraints,
+    field_validator,
+)
+
+from .auth import Identity, key_matches
+from .config import Settings, get_settings
+from .indexer import rebuild_index
+from .jobs import MIME, DraftJobs, provenance, safe_title
+from .providers.local import LocalKnowledgeProvider
+from .providers.sharepoint import SharePointKnowledgeProvider
+from .search import SearchIndex
+
+
+class SearchRequest(BaseModel):
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+    limit: int = Field(default=15, ge=1, le=15)
+    latest_only: bool = True
+
+
+class DraftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    slide_ids: list[Annotated[str, StringConstraints(min_length=1, max_length=128)]] = Field(
+        min_length=1, max_length=20
+    )
+    confirmed: StrictBool
+
+    @field_validator("slide_ids")
+    @classmethod
+    def validate_ids(cls, ids):
+        if len(ids) != len(set(ids)):
+            raise ValueError("Slide IDs must be unique")
+        return ids
+
+    @field_validator("confirmed")
+    @classmethod
+    def require_confirmation(cls, value):
+        if not value:
+            raise ValueError("Explicit confirmation is required")
+        return value
+
+
+def _serialize_result(result) -> dict:
+    return {
+        **provenance(result.slide),
+        "snippet": result.slide.text[:1200],
+        "freshness": result.freshness_status,
+        "relatedVersions": result.related_versions,
+        "relevanceScore": result.relevance_score,
+        "freshnessScore": result.freshness_score,
+        "finalScore": result.final_score,
+        "explanation": result.explanation,
+    }
+
+
+def _copilot_result(result) -> dict[str, str]:
+    slide = result.slide
+    source = f"Source: {slide.deck_name}, slide {slide.slide_number}."
+    period = slide.report_date or slide.effective_year or "unknown"
+    body = " ".join(slide.text.split())[:950]
+    return {
+        "title": f"{slide.deck_name} — Slide {slide.slide_number} — {slide.title}",
+        "snippet": f"{body}\n\n{source} Report period: {period}. {result.freshness_status}.",
+        "url": slide.source_url,
+    }
+
+
+def create_app(index: SearchIndex | None = None, settings: Settings | None = None) -> FastAPI:
+    active_index = index if index is not None else SearchIndex()
+    settings = settings or get_settings()
+    provider = (
+        SharePointKnowledgeProvider(settings)
+        if settings.knowledge_provider == "sharepoint"
+        else LocalKnowledgeProvider(settings.local_presentation_path)
+    )
+    identity = Identity(settings)
+    jobs = DraftJobs(settings.drafts_path, provider)
+    indexing = Lock()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        identity.validate()
+        source_root = settings.local_presentation_path.resolve()
+        output_root = settings.drafts_path.resolve()
+        if settings.knowledge_provider == "local" and output_root.is_relative_to(source_root):
+            raise ValueError("Place DRAFTS_PATH outside the approved source directory")
+        if index is None:
+            rebuild_index(provider, active_index)
+        jobs.start()
+        try:
+            yield
+        finally:
+            jobs.stop()
+
+    app = FastAPI(title="Teams Presentation Assistant", version="1.0.0", lifespan=lifespan)
+    app.state.index = active_index
+    app.state.provider = provider
+    app.state.settings = settings
+    auth = Depends(identity.principal)
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok", "slides": len(active_index), "provider": settings.knowledge_provider}
+
+    @app.get("/api/copilot/search", dependencies=[auth])
+    def copilot_search(q: str = Query(min_length=1, max_length=1000), limit: int = Query(default=15, ge=1)):
+        return {"query": q, "results": [_copilot_result(r) for r in active_index.search(q, min(limit, 15))]}
+
+    @app.post("/api/search", dependencies=[auth])
+    def search(request: SearchRequest):
+        results = active_index.search(request.query, request.limit, request.latest_only)
+        return {"query": request.query, "results": [_serialize_result(result) for result in results]}
+
+    @app.get("/api/slides/{slide_id}/versions", dependencies=[auth])
+    def versions(slide_id: str):
+        try:
+            matched = active_index.versions(slide_id)
+        except KeyError:
+            raise HTTPException(404, "Slide not found") from None
+        return {"slideId": slide_id, "versions": [provenance(s) for s in matched]}
+
+    @app.get("/api/slides/{slide_id}/source", dependencies=[auth])
+    def local_source(slide_id: str):
+        if settings.knowledge_provider != "local":
+            raise HTTPException(404, "Use the SharePoint document URL")
+        try:
+            (slide,) = active_index.lookup([slide_id])
+            with TemporaryDirectory() as directory:
+                paths = provider.snapshot([slide], Path(directory))
+                content = paths[slide.source_key].read_bytes()
+        except KeyError:
+            raise HTTPException(404, "Slide not found") from None
+        except (ValueError, FileNotFoundError):
+            raise HTTPException(409, "Source changed. Refresh the index and search again.") from None
+        return Response(
+            content, media_type=MIME, headers={"Content-Disposition": 'attachment; filename="source.pptx"'}
+        )
+
+    @app.post("/api/drafts", status_code=202)
+    def create_draft(request: DraftRequest, owner: str = auth):
+        try:
+            slides = active_index.lookup(request.slide_ids)
+        except KeyError:
+            raise HTTPException(
+                409, "A selected slide is no longer indexed. Search and confirm again."
+            ) from None
+        try:
+            return jobs.submit(owner, request.title, slides)
+        except OverflowError:
+            raise HTTPException(429, "Draft queue is busy. Try again shortly.") from None
+
+    def owned_job(job_id: str, owner: str = auth):
+        try:
+            return jobs.get(job_id, owner)
+        except KeyError:
+            raise HTTPException(404, "Draft not found") from None
+
+    @app.get("/api/drafts/{job_id}")
+    def get_draft(job=Depends(owned_job)):
+        return job
+
+    @app.get("/api/drafts/{job_id}/file")
+    def download(job=Depends(owned_job)):
+        if job["status"] != "completed":
+            raise HTTPException(409, "The draft is not ready for download")
+        return FileResponse(
+            settings.drafts_path / job["jobId"] / "draft.pptx",
+            media_type=MIME,
+            filename=safe_title(job["title"]) + ".pptx",
+        )
+
+    @app.post("/api/admin/reindex")
+    def reindex(x_admin_key: str = Header(default="")):
+        if not settings.admin_api_key.strip():
+            raise HTTPException(403, "Administrative reindexing is disabled")
+        if not key_matches(x_admin_key, settings.admin_api_key):
+            raise HTTPException(401, "Invalid admin key")
+        if not indexing.acquire(blocking=False):
+            raise HTTPException(409, "An index refresh is already running")
+        try:
+            report = rebuild_index(provider, active_index)
+        except Exception:
+            raise HTTPException(503, "Unable to refresh the approved library") from None
+        finally:
+            indexing.release()
+        return {"status": "ok", **report}
+
+    return app
+
+
+app = create_app()
