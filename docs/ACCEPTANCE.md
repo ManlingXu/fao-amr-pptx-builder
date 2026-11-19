@@ -7,6 +7,7 @@ From the repository root after installing `.[test]`:
 ```text
 python -m pytest
 python scripts/run_demo.py
+python scripts/run_template_demo.py
 ```
 
 The local gate covers search/date evidence, version ranking, confirmation and ordered selection, owner-scoped API jobs, source revalidation, native-slide assembly, safe failures and connector input contracts. The demonstration must return a completed, readable PPTX and an ordered source map. See [verification](VERIFICATION.md) for the current evidence.
@@ -24,6 +25,8 @@ Focused regression cases also cover oversized SharePoint sources alongside valid
 | Explicit confirmation | Declining or changing a selection does not create the old selection; order matches the confirmed list |
 | Changed/deleted source | Source drift blocks creation until refresh and reselection |
 | Native-slide fidelity | Representative drafts open in desktop PowerPoint with editable supported objects and correct notes/styles |
+| Template upload and replacement | Actual chat channel passes original PPTX/POTX bytes, requester-bound template ID is used, replacement creates a new draft and original provenance/notes remain |
+| Template appearance | Master/layout branding and background appear, sample slides are excluded, source content fits the target canvas without stretching |
 | Completed result | Teams shows the exact completed SharePoint link; destination permissions match the approved audience |
 | Failures and capacity | Queue full, unsupported source, restart and upload failure produce useful safe errors |
 | Publication and operation | Agent sharing, Teams installation, hosting, budget, maintenance and retention are recorded |
@@ -32,12 +35,13 @@ Local Graph/Entra mocks and LibreOffice rendering cannot substitute for live ten
 
 ## Supported boundary
 
-- **Inputs:** approved PPTX only; at most 20 unique slides per draft. API searches return at most 15 candidates per request.
+- **Inputs:** approved source PPTX; at most 20 unique slides per draft. API searches return at most 15 candidates per request. Uploaded templates accept PPTX/POTX up to 16 MiB decoded bytes, subject to stricter channel limits.
 - **Sizes:** 64 MiB per source, 256 MiB combined selected source bytes and 128 MiB output.
 - **Preservation:** supported native source objects, images, notes and self-contained chart workbooks; required package dependencies are copied. Embedded workbook data is included.
+- **Template application:** template master/layout/theme and dimensions are applied without importing template sample slides. Source direct formatting is retained. Branding on sample slides alone is not a master design and is not copied. Template reflow is deterministic, without AI slide redesign. Check representative files in desktop PowerPoint.
 - **Rejection:** mismatched slide/notes canvases, incompatible document-wide styles and unsupported/protected dependencies, including macros, encryption, OLE and linked media/data. This is not a guarantee for every PowerPoint feature.
 - **Identity:** one common approved source audience; no per-file user ACL trimming. Entra API job ownership and SharePoint output permissions are separate.
 - **Operations:** one process/instance, two draft workers and twelve outstanding jobs. Incomplete jobs fail on restart. No distributed queue or proactive Teams notification.
 - **Dates:** evidence-based heuristics and version families require human review when ambiguous. A newer indexed result is not proof of scientific correctness or global currency.
 
-中文要点：本地验收证明代码与合成样例的行为；真实账号、Graph 授权、连接器、Teams 发布、文件权限与桌面 PowerPoint 效果仍由 CSI 验收。只复用批准的 PPTX 原页，保留必要权限与来源控制，不扩展新内容生成或美化功能。
+中文要点：本地验收证明代码与合成样例的行为；真实账号、附件传递、Graph 授权、连接器、Teams 发布、文件权限与桌面 PowerPoint 效果仍由 CSI 验收。支持原页复用与上传模板替换，保留来源和可编辑内容；复杂页面排版仍需检查。

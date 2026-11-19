@@ -2,8 +2,8 @@
   "swagger": "2.0",
   "info": {
     "title": "Presentation Assistant",
-    "version": "1.0.0",
-    "description": "Search existing slides, confirm selection, create and retrieve editable drafts."
+    "version": "1.1.0",
+    "description": "Search existing slides, upload a PowerPoint template, create and restyle editable drafts."
   },
   "host": "api.example.invalid",
   "basePath": "/",
@@ -141,6 +141,120 @@
         }
       }
     },
+    "/api/templates": {
+      "post": {
+        "operationId": "UploadTemplate",
+        "summary": "Upload a chat attachment as a PowerPoint template",
+        "x-ms-summary": "Upload a chat attachment as a PowerPoint template",
+        "description": "Upload a chat attachment as a PowerPoint template",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "file_name",
+                "content_base64"
+              ],
+              "properties": {
+                "file_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 180,
+                  "description": "Attachment file name ending in .pptx or .potx"
+                },
+                "content_base64": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 22369624,
+                  "description": "Base64 of the original binary file, bound from a File input; never fill with AI"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Template"
+            }
+          },
+          "default": {
+            "description": "Request rejected or operation failed",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/api/drafts/{job_id}/template": {
+      "post": {
+        "operationId": "ApplyTemplate",
+        "summary": "Apply an uploaded template to a completed draft",
+        "x-ms-summary": "Apply an uploaded template to a completed draft",
+        "description": "Apply an uploaded template to a completed draft",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "template_id",
+                "confirmed"
+              ],
+              "properties": {
+                "template_id": {
+                  "type": "string",
+                  "minLength": 32,
+                  "maxLength": 32,
+                  "pattern": "^[0-9a-f]{32}$",
+                  "description": "Exact templateId returned by UploadTemplate for this signed-in user"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "x-nullable": true
+                },
+                "confirmed": {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ],
+                  "description": "True only when user explicitly requests this template for this completed draft"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Job"
+            }
+          },
+          "default": {
+            "description": "Request rejected or operation failed",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
     "/api/drafts": {
       "post": {
         "operationId": "CreateDraft",
@@ -182,6 +296,14 @@
                     true
                   ],
                   "description": "True only after the user explicitly approves the ordered selection"
+                },
+                "template_id": {
+                  "type": "string",
+                  "minLength": 32,
+                  "maxLength": 32,
+                  "pattern": "^[0-9a-f]{32}$",
+                  "description": "Exact templateId returned by UploadTemplate for this signed-in user",
+                  "x-nullable": true
                 }
               }
             }
@@ -370,6 +492,71 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/SourceMapEntry"
+          }
+        },
+        "template": {
+          "type": "object",
+          "properties": {
+            "templateId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "fileName": {
+              "type": "string"
+            },
+            "slideWidth": {
+              "type": "integer"
+            },
+            "slideHeight": {
+              "type": "integer"
+            },
+            "layoutNames": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "x-nullable": true
+        },
+        "sourceJobId": {
+          "type": "string",
+          "x-nullable": true
+        }
+      }
+    },
+    "Template": {
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "slideWidth": {
+          "type": "integer"
+        },
+        "slideHeight": {
+          "type": "integer"
+        },
+        "layoutNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         }
       }

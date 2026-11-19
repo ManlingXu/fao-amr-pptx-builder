@@ -24,6 +24,30 @@ from .jobs import MIME, DraftJobs, provenance, safe_title
 from .providers.local import LocalKnowledgeProvider
 from .providers.sharepoint import SharePointKnowledgeProvider
 from .search import SearchIndex
+from .templates import MAX_TEMPLATE_BASE64, TemplateStore
+
+TemplateId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$", min_length=32, max_length=32)]
+Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+
+class TemplateUploadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    file_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=180)]
+    content_base64: Annotated[str, StringConstraints(min_length=1, max_length=MAX_TEMPLATE_BASE64)]
+
+
+class ApplyTemplateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    template_id: TemplateId
+    title: Title | None = None
+    confirmed: StrictBool
+
+    @field_validator("confirmed")
+    @classmethod
+    def require_confirmation(cls, value):
+        if not value:
+            raise ValueError("Explicit confirmation is required")
+        return value
 
 
 class SearchRequest(BaseModel):
@@ -34,11 +58,12 @@ class SearchRequest(BaseModel):
 
 class DraftRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    title: Title
     slide_ids: list[Annotated[str, StringConstraints(min_length=1, max_length=128)]] = Field(
         min_length=1, max_length=20
     )
     confirmed: StrictBool
+    template_id: TemplateId | None = None
 
     @field_validator("slide_ids")
     @classmethod
@@ -90,6 +115,7 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
     )
     identity = Identity(settings)
     jobs = DraftJobs(settings.drafts_path, provider)
+    templates = TemplateStore(settings.drafts_path / "templates")
     indexing = Lock()
 
     @asynccontextmanager
@@ -107,7 +133,7 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
         finally:
             jobs.stop()
 
-    app = FastAPI(title="Teams Presentation Assistant", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="Teams Presentation Assistant", version="1.1.0", lifespan=lifespan)
     app.state.index = active_index
     app.state.provider = provider
     app.state.settings = settings
@@ -159,8 +185,38 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
             raise HTTPException(
                 409, "A selected slide is no longer indexed. Search and confirm again."
             ) from None
+        template = owned_template(request.template_id, owner) if request.template_id else None
         try:
-            return jobs.submit(owner, request.title, slides)
+            return jobs.submit(owner, request.title, slides, template)
+        except OverflowError:
+            raise HTTPException(429, "Draft queue is busy. Try again shortly.") from None
+
+    @app.post("/api/templates", status_code=201)
+    def upload_template(request: TemplateUploadRequest, owner: str = auth):
+        try:
+            return templates.create(owner, request.file_name, request.content_base64)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    def owned_template(template_id: str, owner: str):
+        try:
+            return templates.get(template_id, owner)
+        except KeyError:
+            raise HTTPException(404, "Template not found. Upload the template again.") from None
+
+    @app.get("/api/templates/{template_id}")
+    def template_metadata(template_id: str, owner: str = auth):
+        metadata, _ = owned_template(template_id, owner)
+        return metadata
+
+    @app.post("/api/drafts/{job_id}/template", status_code=202)
+    def replace_template(job_id: str, request: ApplyTemplateRequest, owner: str = auth):
+        source = owned_job(job_id, owner)
+        if source["status"] != "completed":
+            raise HTTPException(409, "The source draft is not ready for a template change.")
+        template = owned_template(request.template_id, owner)
+        try:
+            return jobs.submit_template(owner, source, request.title or source["title"], template)
         except OverflowError:
             raise HTTPException(429, "Draft queue is busy. Try again shortly.") from None
 

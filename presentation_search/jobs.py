@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
@@ -69,7 +70,15 @@ class DraftJobs:
             os.fsync(output.fileno())
         os.replace(output.name, folder / "status.json")
 
-    def submit(self, owner: str, title: str, slides: list[SlideDocument]) -> dict:
+    def submit(self, owner: str, title: str, slides: list[SlideDocument], template=None) -> dict:
+        return self._submit(owner, title, slides, template)
+
+    def submit_template(self, owner: str, source_job: dict, title: str, template) -> dict:
+        if source_job["status"] != "completed":
+            raise ValueError("The source draft is not ready for a template change.")
+        return self._submit(owner, title, [], template, source_job)
+
+    def _submit(self, owner, title, slides, template, source_job=None):
         if self.pool is None or not self.slots.acquire(blocking=False):
             raise OverflowError("Draft queue is busy. Try again shortly.")
         try:
@@ -87,7 +96,15 @@ class DraftJobs:
                 "webUrl": None,
                 "downloadUrl": None,
                 "error": None,
+                "template": template[0] if template else None,
+                "sourceJobId": source_job["jobId"] if source_job else None,
             }
+            if template:
+                shutil.copyfile(template[1], folder / "template.upload")
+            if source_job:
+                shutil.copyfile(self.root / source_job["jobId"] / "draft.pptx", folder / "source.pptx")
+                record["sourceMap"] = source_job["sourceMap"]
+                record["warnings"] = source_job["warnings"]
             self._write(record)
             self.pool.submit(self._build, record.copy(), slides)
             return {key: record[key] for key in ("jobId", "status", "statusUrl")}
@@ -103,12 +120,28 @@ class DraftJobs:
             self._write(record)
             with TemporaryDirectory(dir=folder) as scratch:
                 work = Path(scratch)
-                paths = self.provider.snapshot(slides, work / "sources")
-                selections = [(paths[s.source_key], s.slide_number) for s in slides]
-                from .assembly import assemble_slides
-
                 output = work / "assembled.pptx"
-                report = assemble_slides(selections, output)
+                if record.get("sourceJobId"):
+                    shutil.copyfile(folder / "source.pptx", output)
+                    report = {"warnings": record["warnings"]}
+                else:
+                    paths = self.provider.snapshot(slides, work / "sources")
+                    selections = [(paths[s.source_key], s.slide_number) for s in slides]
+                    from .assembly import assemble_slides
+
+                    report = assemble_slides(selections, output)
+                if record.get("template"):
+                    from .templating import apply_template
+
+                    template_path = work / ("uploaded-template" + Path(record["template"]["fileName"]).suffix.lower())
+                    shutil.copyfile(folder / "template.upload", template_path)
+                    styled = work / "templated.pptx"
+                    template_report = apply_template(output, template_path, styled)
+                    report["warnings"] = list(dict.fromkeys(
+                        report.get("warnings", []) + record["template"].get("warnings", [])
+                        + template_report.get("warnings", [])
+                    ))
+                    output = styled
                 if output.stat().st_size > 128 * 1024 * 1024:
                     raise ValueError("Draft exceeds the 128 MiB limit.")
                 filename = f"{safe_title(record['title'])}-{job_id}.pptx"
@@ -119,7 +152,8 @@ class DraftJobs:
                 webUrl=url,
                 downloadUrl=f"/api/drafts/{job_id}/file",
                 warnings=report.get("warnings", []),
-                sourceMap=[{"outputSlide": n, **provenance(s)} for n, s in enumerate(slides, 1)],
+                sourceMap=(record["sourceMap"] if record.get("sourceJobId") else
+                           [{"outputSlide": n, **provenance(s)} for n, s in enumerate(slides, 1)]),
             )
         except Exception as exc:
             logger.warning("Draft %s failed (%s)", job_id, type(exc).__name__)
@@ -153,6 +187,8 @@ def _safe_error(exc: Exception) -> str:
         return STALE
     if "limit" in msg.lower() or "exceed" in msg.lower():
         return "The selection exceeds the pilot package or size limits."
+    if "animated" in msg.lower():
+        return "Template replacement does not support animated slides. Use a copy without animations."
     if any(word in msg.lower() for word in ("canvas", "dimension", "slide size", "aspect ratio")):
         return "The selected source slides use different slide sizes."
     if isinstance(exc, ValueError):

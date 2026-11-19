@@ -1,7 +1,7 @@
 {
   "type": "configuration-blueprint",
   "importableSolution": false,
-  "version": "1.0",
+  "version": "1.1",
   "topic": "Create a draft from existing slides",
   "steps": [
     {
@@ -47,13 +47,21 @@
       "onNo": "select"
     },
     {
+      "id": "optional_template",
+      "kind": "conditional-topic",
+      "when": "User supplies or requests a PowerPoint template",
+      "topic": "Upload and apply a PowerPoint template",
+      "output": "templateId, fileName and warnings; omit template_id when not requested"
+    },
+    {
       "id": "create",
       "kind": "tool",
       "operationId": "CreateDraft",
       "input": {
         "slide_ids": "confirmed ordered unique IDs",
         "confirmed": true,
-        "title": "user title"
+        "title": "user title",
+        "template_id": "optional exact templateId returned by the upload topic; omit when absent"
       }
     },
     {
@@ -83,6 +91,65 @@
       "askEndUserBeforeRunning": true,
       "inputBinding": "Use confirmed topic variables, not AI-filled confirmation."
     },
-    "organizationalAuthentication": "End user"
+    "organizationalAuthentication": "End user",
+    "UploadTemplate": {
+      "allowDynamicUse": false,
+      "inputBinding": "Bind file_name and original binary content_base64 through a File-input topic/flow. Never fill these with AI."
+    },
+    "ApplyTemplate": {
+      "allowDynamicUse": false,
+      "inputBinding": "Bind owned completed job_id and uploaded template_id after an explicit user request. Do not add redundant confirmation when intent and target are clear."
+    }
+  },
+  "templateWorkflow": {
+    "reference": "../../docs/TEMPLATE_WORKFLOW_EN.md",
+    "steps": [
+      {
+        "id": "capture_file",
+        "kind": "file-question-or-attachment",
+        "variable": "Topic.templateFile",
+        "includeFileMetadata": true,
+        "note": "Guard against empty System.Activity.Attachments. If multiple files arrive, establish which is the template."
+      },
+      {
+        "id": "upload_file",
+        "kind": "agent-flow",
+        "fileInputType": "File",
+        "inputFormula": "{ contentBytes: Topic.templateFile.Content, name: Topic.templateFile.Name }",
+        "action": {
+          "operationId": "UploadTemplate",
+          "input": {
+            "file_name": "File input name",
+            "content_base64": "File input contentBytes (already Base64)"
+          }
+        },
+        "output": "templateId, fileName and warnings",
+        "identity": "Same end-user requester as CreateDraft and ApplyTemplate"
+      },
+      {
+        "id": "choose_target",
+        "kind": "condition",
+        "newSelection": "CreateDraft with optional template_id",
+        "completedDraft": {
+          "operationId": "ApplyTemplate",
+          "input": {
+            "job_id": "exact completed owned jobId",
+            "template_id": "exact upload result templateId",
+            "confirmed": true,
+            "title": "optional new title"
+          }
+        }
+      },
+      {
+        "id": "template_status",
+        "kind": "tool",
+        "operationId": "GetDraftStatus",
+        "input": {
+          "job_id": "new jobId"
+        },
+        "onCompleted": "Return new webUrl and relevant warnings; retain original draft link."
+      }
+    ],
+    "validation": "PPTX/POTX binary attachment support must be tested in the selected agent harness and actual published channel; backend support does not imply channel support."
   }
 }

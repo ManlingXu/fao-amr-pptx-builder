@@ -31,13 +31,24 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
         "dateConfidence":{"type":"number"}, "dateReason":{"type":"string"},
         "sourceHash":{"type":"string"}
     }}
+    template = {"type":"object","properties":{
+        "templateId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
+        "fileName":{"type":"string"}, "slideWidth":{"type":"integer"},
+        "slideHeight":{"type":"integer"},
+        "layoutNames":{"type":"array","items":{"type":"string"}},
+        "warnings":{"type":"array","items":{"type":"string"}}
+    }}
+    template_id = {"type":"string","minLength":32,"maxLength":32,"pattern":"^[0-9a-f]{32}$",
+                   "description":"Exact templateId returned by UploadTemplate for this signed-in user"}
     job = {"type":"object","properties":{
         "jobId":{"type":"string"}, "status":{"type":"string","enum":["queued","running","completed","failed"]},
         "statusUrl":{"type":"string"}, "title":{"type":"string"},
         "downloadUrl":{"type":"string","x-nullable":True},
         "webUrl":{"type":"string","x-nullable":True}, "error":{"type":"string","x-nullable":True},
         "warnings":{"type":"array","items":{"type":"string"}},
-        "sourceMap":{"type":"array","items":{"$ref":"#/definitions/SourceMapEntry"}}
+        "sourceMap":{"type":"array","items":{"$ref":"#/definitions/SourceMapEntry"}},
+        "template":{**template,"x-nullable":True},
+        "sourceJobId":{"type":"string","x-nullable":True}
     }}
     if auth == "api-key":
         security = {"ApiKey":{"type":"apiKey","in":"header","name":"X-API-Key"}}
@@ -66,13 +77,26 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
     draft_request = {"type":"object","required":["title","slide_ids","confirmed"],"properties":{
         "title":{"type":"string","minLength":1,"maxLength":120},
         "slide_ids":{"type":"array","minItems":1,"maxItems":20,"uniqueItems":True,"items":{"type":"string","minLength":1,"maxLength":128}},
-        "confirmed":{"type":"boolean","enum":[True],"description":"True only after the user explicitly approves the ordered selection"}
+        "confirmed":{"type":"boolean","enum":[True],"description":"True only after the user explicitly approves the ordered selection"},
+        "template_id":{**template_id,"x-nullable":True}
+    }}
+    upload_request = {"type":"object","required":["file_name","content_base64"],"properties":{
+        "file_name":{"type":"string","minLength":1,"maxLength":180,
+                     "description":"Attachment file name ending in .pptx or .potx"},
+        "content_base64":{"type":"string","minLength":1,"maxLength":22369624,
+                          "description":"Base64 of the original binary file, bound from a File input; never fill with AI"}
+    }}
+    apply_request = {"type":"object","required":["template_id","confirmed"],"properties":{
+        "template_id":template_id,
+        "title":{"type":"string","minLength":1,"maxLength":120,"x-nullable":True},
+        "confirmed":{"type":"boolean","enum":[True],
+                     "description":"True only when user explicitly requests this template for this completed draft"}
     }}
     body=lambda schema:[{"name":"body","in":"body","required":True,"schema":schema}]
     path=lambda name:[{"name":name,"in":"path","required":True,"type":"string"}]
     return {
-      "swagger":"2.0","info":{"title":"Presentation Assistant","version":"1.0.0",
-      "description":"Search existing slides, confirm selection, create and retrieve editable drafts."},
+      "swagger":"2.0","info":{"title":"Presentation Assistant","version":"1.1.0",
+      "description":"Search existing slides, upload a PowerPoint template, create and restyle editable drafts."},
       "host":url.netloc,"basePath":url.path.rstrip("/") or "/","schemes":["https"],
       "consumes":["application/json"],"produces":["application/json"],
       "securityDefinitions":security,"security":requirement,
@@ -81,10 +105,12 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
           {"type":"object","properties":{"query":{"type":"string"},"results":{"type":"array","items":{"$ref":"#/definitions/Slide"}}}})},
         "/api/slides/{slide_id}/versions":{"get":operation("GetSlideVersions","Inspect related source versions",path("slide_id"),
           {"type":"object","properties":{"slideId":{"type":"string"},"versions":{"type":"array","items":{"$ref":"#/definitions/Slide"}}}})},
+        "/api/templates":{"post":operation("UploadTemplate","Upload a chat attachment as a PowerPoint template",body(upload_request),{"$ref":"#/definitions/Template"},"201")},
+        "/api/drafts/{job_id}/template":{"post":operation("ApplyTemplate","Apply an uploaded template to a completed draft",path("job_id")+body(apply_request),{"$ref":"#/definitions/Job"},"202")},
         "/api/drafts":{"post":operation("CreateDraft","Create a draft after user confirmation",body(draft_request),{"$ref":"#/definitions/Job"},"202")},
         "/api/drafts/{job_id}":{"get":operation("GetDraftStatus","Check draft status and file link",path("job_id"),{"$ref":"#/definitions/Job"})}
       },
-      "definitions":{"Slide":slide,"SourceMapEntry":provenance,"Job":job}
+      "definitions":{"Slide":slide,"SourceMapEntry":provenance,"Job":job,"Template":template}
     }
 
 def main():

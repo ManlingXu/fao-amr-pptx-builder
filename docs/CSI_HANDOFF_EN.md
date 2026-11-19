@@ -4,6 +4,8 @@
 
 A Teams agent finds approved source slides, shows sources and reporting dates, asks the user to confirm an ordered selection, and saves an editable draft to an authorized SharePoint location.
 
+The new [template upload workflow](TEMPLATE_WORKFLOW_EN.md) lets users supply a PPTX/POTX design for a new or completed draft. Backend operations are implemented; CSI must bind original attachment bytes and verify file types and size limits on the actual Teams channel. Uploaded templates stay in requester-owned storage and are excluded from the knowledge index.
+
 The package provides code, local synthetic examples, connector templates and configuration instructions. CSI must provision and validate the organizational connection.
 
 ## What CSI supplies
@@ -14,6 +16,7 @@ The package provides code, local synthetic examples, connector templates and con
 | Audience and content | One group authorized to read every file in the configured source library; content owner confirms source approval |
 | Backend API | Entra API registration/audience, v2 delegated `access_as_user` scope, assigned allowed role or group |
 | Connector | OAuth client and returned redirect URI; end-user credentials; permitted custom connector, data policy and network route |
+| Template file input | File-input topic/flow, `name` and `contentBytes` mapping, same requester for upload and generation, actual PPTX/POTX channel validation |
 | Graph service identity | Application permission and explicit resource grants for source reads and output writes |
 | Storage | Separate source/output locations; existing output-folder permissions, retention and maintenance owner |
 | Hosting | Approved HTTPS endpoint, outbound Microsoft access, one instance/process and persistent storage |

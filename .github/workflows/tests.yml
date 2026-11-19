@@ -30,5 +30,7 @@ jobs:
         run: python -m pytest
       - name: Run synthetic API demonstration
         run: python scripts/run_demo.py --output build/ci-demo
+      - name: Run template upload and replacement demonstration
+        run: python scripts/run_template_demo.py --output build/ci-template-demo
       - name: Check shell syntax
         run: bash -n start-local.sh deploy-azure.sh deploy/azure-appservice.sh
