@@ -219,8 +219,7 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
                     for s in request.sections]
         try:
             return plans.create(owner, request.title, request.audience, request.purpose,
-                                sections, request.template_id,
-                                template_provided=("template_id" in request.model_fields_set))
+                                sections, request.template_id)
         except KeyError:
             raise HTTPException(404, "Template not found for this user") from None
         except ValueError as exc:
@@ -240,7 +239,8 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
                     for s in request.sections]
         try:
             return plans.revise(owner, plan_id, request.expected_revision,
-                                sections, request.template_id)
+                                sections, request.template_id,
+                                template_provided=("template_id" in request.model_fields_set))
         except KeyError:
             raise HTTPException(404, "Plan or template not found for this user") from None
         except PlanConflict as exc:
