@@ -1,7 +1,7 @@
 {
   "type": "configuration-blueprint",
   "importableSolution": false,
-  "version": "1.1",
+  "version": "2.0",
   "topic": "Create a draft from existing slides",
   "steps": [
     {
@@ -151,5 +151,102 @@
       }
     ],
     "validation": "PPTX/POTX binary attachment support must be tested in the selected agent harness and actual published channel; backend support does not imply channel support."
+  },
+  "v2StorylineWorkflow": {
+    "status": "design blueprint only: must be configured manually in an approved Copilot Studio tenant",
+    "importableSolution": false,
+    "trigger": "User asks for a multi-section presentation or for revisions to a saved plan",
+    "steps": [
+      {
+        "kind": "llm-plan",
+        "id": "outline",
+        "prompt": "Propose 2–8 audience-specific sections with title, query, estimated slides, and goals. Do not invent facts or source IDs."
+      },
+      {
+        "kind": "tool",
+        "id": "plan",
+        "operationId": "PlanPresentation",
+        "args": {
+          "title": "user-approved presentation title",
+          "audience": "audience",
+          "purpose": "purpose",
+          "sections": "structured outline",
+          "template_id": "optional uploaded owner-scoped template ID"
+        }
+      },
+      {
+        "kind": "message",
+        "id": "review",
+        "content": "Present section structure, exact source slide IDs, file, page, report period, gap flags, and plan revision. Explain any uncertainties."
+      },
+      {
+        "kind": "choice",
+        "id": "amend",
+        "when": "User requests a new section, focus, order, dates or template",
+        "actions": [
+          {
+            "operationId": "GetPresentationPlan",
+            "inputs": {
+              "plan_id": "plan.planId"
+            }
+          },
+          {
+            "operationId": "SearchSlides",
+            "if": "New candidate slides needed"
+          },
+          {
+            "operationId": "RevisePresentationPlan",
+            "inputs": {
+              "plan_id": "plan.planId",
+              "expected_revision": "latest revision",
+              "sections": "full revised section list with exact source slide IDs",
+              "template_id": "omit to keep existing template"
+            }
+          }
+        ],
+        "next": "review"
+      },
+      {
+        "kind": "question",
+        "id": "confirm",
+        "required": "User explicitly approves the precise current planId, revision, source order and template. No call on refusal."
+      },
+      {
+        "kind": "tool",
+        "id": "create",
+        "operationId": "CreateDraftFromPlan",
+        "args": {
+          "plan_id": "current saved planId",
+          "expected_revision": "latest revision",
+          "confirmed": true
+        },
+        "trigger": "only after explicit confirmation of latest plan"
+      },
+      {
+        "kind": "tool",
+        "id": "status",
+        "operationId": "GetDraftStatus",
+        "onPending": "Inform user of queued/running state; check on request.",
+        "onCompleted": "Return authenticated SharePoint webUrl with warnings and sourceMap; no invented link."
+      }
+    ],
+    "toolConfiguration": {
+      "CreateDraftFromPlan": {
+        "allowDynamicUse": false,
+        "askEndUserBeforeRunning": true,
+        "inputBinding": "Bound from confirmed topic variables only"
+      },
+      "RevisePresentationPlan": {
+        "allowDynamicUse": false,
+        "inputBinding": "Bound to current plan revision; never silently overwrite concurrent edits"
+      }
+    },
+    "boundaries": [
+      "No AI-generated factual slides in V2.",
+      "Existing template apply is limited; no claim of automatic full redesign.",
+      "There is no dedicated semantic vector service; LLM generates search queries.",
+      "Plan data stores approved slide references, not newly invented facts.",
+      "No tenant publication or connector import is performed by this file."
+    ]
   }
 }
