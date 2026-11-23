@@ -45,3 +45,15 @@ Local Graph/Entra mocks and LibreOffice rendering cannot substitute for live ten
 - **Dates:** evidence-based heuristics and version families require human review when ambiguous. A newer indexed result is not proof of scientific correctness or global currency.
 
 中文要点：本地验收证明代码与合成样例的行为；真实账号、附件传递、Graph 授权、连接器、Teams 发布、文件权限与桌面 PowerPoint 效果仍由 CSI 验收。支持原页复用与上传模板替换，保留来源和可编辑内容；复杂页面排版仍需检查。
+
+## V2 storyline acceptance
+
+The automated test suite also covers V2 `PlanPresentation`, `GetPresentationPlan`, `RevisePresentationPlan`, and `CreateDraftFromPlan`:
+
+- An audience/purpose-specific outline contains actual approved source slide IDs, deck/page identifiers and reporting periods; it displays missing-section gaps instead of fabricating information.
+- A follow-up can reorder sections and their slide IDs. A stale `expected_revision` produces HTTP 409 and does not overwrite the current plan.
+- A user cannot read or revise another user's saved plan; uploaded templates must belong to the same requester. An omitted template during revision retains the previous choice.
+- Draft generation rejects `confirmed=false`, requires confirmation of the latest plan revision, and outputs the ordered original slides with source map. Creation still revalidates changed source files before assembly.
+- New capabilities are backed by a synthetic HTTP demonstration (`python scripts/run_storyline_demo.py`), not by production Copilot conversational evidence.
+
+Live CSI acceptance must test the **actual agent's multi-turn planning**, tool input mappings, user approval behavior, individual account authorization, template compatibility and resource consumption. A generic LLM planning statement is not proof of an executed tool call or a completed PPTX. See [V2 guide](V2_WORKFLOW_EN.md).
