@@ -67,3 +67,9 @@ Complete [acceptance](ACCEPTANCE.md) with two real users and representative sour
 Publish, add the Teams channel, and first install for a one-to-one pilot. Share agent access with the pilot audience before distributing the installation link. Broader organization catalog distribution follows CSI's approval process; agent access, installation and document access are separate. See [Microsoft Teams publication](https://learn.microsoft.com/en-us/microsoft-copilot-studio/publication-add-bot-to-microsoft-teams).
 
 Record the live results and operational owners before announcing availability.
+
+## V2: planning and iterative revision
+
+Four tools extend the original six: `PlanPresentation`, `GetPresentationPlan`, `RevisePresentationPlan` and `CreateDraftFromPlan`. Copilot Studio proposes section names, search queries and page counts for the stated audience and purpose. The backend stores only slide IDs returned from the approved index and shows coverage gaps. For a follow-up such as “less background, more FAO projects,” fetch the latest plan, search for new valid IDs if necessary, and call `RevisePresentationPlan` with the **complete** updated section list and current `expected_revision`. Reject stale revisions; never invent missing slides.
+
+**Before generating, ask the user to explicitly approve the exact planId, revision, slide order and template.** Disable dynamic usage for `CreateDraftFromPlan`, enable “Ask the end user before running,” and bind `confirmed=true` from the approval topic rather than model-generated arguments. Poll `GetDraftStatus` and show only the actual completed SharePoint webUrl. The V2 section of `flow-design.json` is **a blueprint, not an importable agent/topic/flow**. See the complete [V2 workflow guide](V2_WORKFLOW_EN.md).
