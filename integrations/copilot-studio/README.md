@@ -18,3 +18,12 @@ Completed Teams delivery uses the authenticated SharePoint `webUrl`. `downloadUr
 Follow [English setup](../../docs/COPILOT_STUDIO_EN.md) or [中文配置](../../docs/COPILOT_STUDIO_CN.md).
 
 For chat uploads and template replacement, follow [English template workflow](../../docs/TEMPLATE_WORKFLOW_EN.md) or [中文模板流程](../../docs/TEMPLATE_WORKFLOW_CN.md). The backend accepts PPTX/POTX, but actual chat attachment support and end-user identity propagation require channel validation.
+
+## V2 Planning operations
+
+- `PlanPresentation` (`POST /api/plans`) — sections, queries, target counts and optional template.
+- `GetPresentationPlan` (`GET /api/plans/{plan_id}`) — owner-scoped stored plan and latest revision.
+- `RevisePresentationPlan` (`PUT /api/plans/{plan_id}`) — complete revised selection with expected revision; conflicts are rejected.
+- `CreateDraftFromPlan` (`POST /api/plans/{plan_id}/draft`) — explicitly confirmed current revision only.
+
+These operations are in both Swagger specifications and the exporter. Configure the topic described in [V2 instructions](../../docs/V2_WORKFLOW_EN.md) **manually**. The JSON blueprint is not an installable Copilot agent. Applying a template reuses existing V1.1 uploaded-template functionality; it is not automatic full layout design.
