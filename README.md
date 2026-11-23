@@ -1,20 +1,21 @@
 # Teams PowerPoint Assistant
 
-Find approved existing slides, review sources and reporting dates, confirm the slide order, and assemble an editable draft for Teams.
+Find approved existing slides, propose an audience-specific presentation storyline, revise ordered sections over several turns, confirm the latest plan revision, and assemble an editable PowerPoint draft for Teams.
 
 **中文：** 从批准的共享 PPTX 中选页，核对来源、版本和数据时间；确认顺序后生成可编辑初稿。也可以在对话中上传 PPT 模板，为新初稿或已完成的初稿更换模板，并返回有访问权限控制的 SharePoint 链接。
 
-[中文开始](docs/START_HERE_CN.md) · [Start here](docs/START_HERE_EN.md) · [Copilot setup](docs/COPILOT_STUDIO_EN.md) · [CSI handoff](docs/CSI_HANDOFF_EN.md)
+[中文开始](docs/START_HERE_CN.md) · [Start here](docs/START_HERE_EN.md) · **[V2 Storyline workflow](docs/V2_WORKFLOW_EN.md)** · **[V2 中文流程](docs/V2_WORKFLOW_CN.md)** · [Copilot setup](docs/COPILOT_STUDIO_EN.md) · [CSI handoff](docs/CSI_HANDOFF_EN.md)
 
 ## One workflow
 
 1. **Understand:** Copilot Studio supplies the conversational LLM and collects the request.
 2. **Search and review:** the backend searches approved PPTX slides and returns the source deck, slide number, reporting date and date evidence. Related versions are available for review.
-3. **Confirm:** the user approves the exact slides and their order before creation.
-4. **Assemble:** the backend rechecks source files and copies supported original slides and dependencies into a draft, retaining native editable content and source formatting. Optionally upload a template and apply its master, layout, theme and canvas to the selected slides or to a completed draft.
-5. **Deliver:** Copilot checks the job result and returns its authenticated SharePoint link, warnings and source map.
+3. **Plan and revise (V2):** Copilot Studio proposes sections and per-section queries. The backend saves a revisioned plan with real candidate slide IDs. Follow-up requests can reorder sections and selected slides; coverage gaps remain visible.
+4. **Confirm:** the user approves the exact current plan revision, slides, order and chosen template before creation.
+5. **Assemble:** the backend rechecks source files and copies supported original slides and dependencies into a draft, retaining native editable content and source formatting. Optionally upload a template and apply its master, layout, theme and canvas to the selected slides or to a completed draft.
+6. **Deliver:** Copilot checks the job result and returns its authenticated SharePoint link, warnings and source map.
 
-The [template upload workflow](docs/TEMPLATE_WORKFLOW_EN.md) includes file-input mapping and two new tools. Backend template processing is implemented; chat attachment support, connector configuration and Teams publication still require tenant validation. Original direct formatting is retained, so applying a template does not automatically redesign every slide.
+The [V2 plan workflow](docs/V2_WORKFLOW_EN.md) adds four versioned planning tools (Create/Read/Revise/Finalize), with real-user authentication and current-revision checks. The [template upload workflow](docs/TEMPLATE_WORKFLOW_EN.md) includes file-input mapping and two new tools. Backend template processing is implemented; chat attachment support, connector configuration and Teams publication still require tenant validation. Original direct formatting is retained, so applying a template does not automatically redesign every slide.
 
 This version has no new factual-slide generation, PDF/DOCX ingestion, separate chat UI, vector search or additional backend LLM. The local API demonstration uses synthetic content and does not provide a Copilot conversation.
 
@@ -30,22 +31,28 @@ python -m venv .venv
 .venv/bin/python scripts/run_template_demo.py
 ```
 
-On Windows, substitute `.venv/Scripts/python.exe` for `.venv/bin/python`. The demo saves a three-slide draft and provenance in `examples/output/`. It calls no Microsoft service or model. All included sample decks are synthetic; they are not FAO evidence.
+On Windows, substitute `.venv/Scripts/python.exe` for `.venv/bin/python`. The V1 demo saves a three-slide draft and provenance in `examples/output/`. The V2 demo saves a revised storyline, source map and editable draft in `examples/output/v2/`. It calls no Microsoft service or model. All included sample decks are synthetic; they are not FAO evidence.
 
 For the local API, run `start-local.cmd` on Windows or `bash start-local.sh` on macOS/Linux, then open <http://127.0.0.1:8000/docs>.
 
-## Connect the six tools
+## Connect the ten tools
 
 | Copilot tool | Purpose |
 |---|---|
 | `SearchSlides` | Find candidates with source and date evidence |
 | `GetSlideVersions` | Review related source versions |
+| `PlanPresentation` | Propose a section-by-section storyline grounded in approved slides |
+| `GetPresentationPlan` | Read the current saved plan and revision |
+| `RevisePresentationPlan` | Change section order and selected slides; reject stale revisions |
+| `CreateDraftFromPlan` | Create only after approval of the exact current plan |
 | `UploadTemplate` | Receive the uploaded PPTX/POTX file as bytes and return a private template ID |
 | `CreateDraft` | Submit explicitly confirmed, ordered slide IDs and an optional template ID |
 | `ApplyTemplate` | Apply an uploaded template to an owned completed draft, creating a new file |
 | `GetDraftStatus` | Retrieve progress and the completed result |
 
 Production uses Entra user authentication and a separately authorized Graph service identity. The API-key definition is for a local or controlled pilot. `flow-design.json` is a configuration blueprint, not an importable agent or solution. Follow the [Chinese](docs/COPILOT_STUDIO_CN.md) or [English](docs/COPILOT_STUDIO_EN.md) setup guide.
+
+**V2 is backend code plus a Copilot topic blueprint, not an already-published Teams agent.** The LLM plans content only once Copilot Studio has been configured; local tests are synthetic and use deterministic section queries.
 
 ## Operating boundary
 
