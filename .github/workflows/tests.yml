@@ -3,7 +3,7 @@ name: Core workflow tests
 on:
   pull_request:
   push:
-    branches: [main, feature/v2-storyline-planning]
+    branches: [main, "feature/**"]
   workflow_dispatch:
 
 permissions:
@@ -32,5 +32,7 @@ jobs:
         run: python scripts/run_demo.py --output build/ci-demo
       - name: Run template upload and replacement demonstration
         run: python scripts/run_template_demo.py --output build/ci-template-demo
+      - name: Run V2 storyline planning and revision demonstration
+        run: python scripts/run_storyline_demo.py --output build/ci-storyline-demo
       - name: Check shell syntax
         run: bash -n start-local.sh deploy-azure.sh deploy/azure-appservice.sh
