@@ -1,8 +1,18 @@
 # Verification / 验证记录
 
-Local verification date: 19 November 2026, Python 3.12.
+Local baseline verification: 19 November 2026, Python 3.12. V2 automated verification: 23 November 2026.
 
-## Current results
+## V2 verification (23 November 2026)
+
+The V2 storyline branch was tested by [GitHub Actions run 45173582029](https://github.com/ManlingXu/fao-amr-pptx-builder/actions/runs/45173582029) with **Python 3.11 and 3.12**; both jobs succeeded. The Python 3.12 job reported **145 passed, 1 dependency deprecation warning**. The run includes the V1 search/assembly demonstration, uploaded-template demonstration and a **V2 end-to-end storyline demonstration**.
+
+New V2 tests cover owner-scoped plans, audience-specific section queries, source/date display, missing-section gaps, full-list edits, section reordering, optimistic revision conflicts, explicit approval, live editable PPT creation, template ownership, and exact connector/export schema consistency.
+
+These results demonstrate **local/backend functionality using synthetic inputs only**. They do NOT demonstrate LLM content planning quality, organization-wide Copilot Studio tool configuration, Microsoft Graph permissions, Teams publication or desktop PowerPoint acceptance for real FAO files.
+
+
+
+## V1.1 baseline results (19 November 2026)
 
 | Check | Actual result |
 |---|---|
@@ -32,6 +42,7 @@ After installing `.[test]`, run from the repository root:
 python -m pytest
 python scripts/run_demo.py --output build/demo
 python scripts/run_template_demo.py --output build/template-demo
+python scripts/run_storyline_demo.py --output build/storyline-demo
 python scripts/make_deploy_zip.py
 ```
 
