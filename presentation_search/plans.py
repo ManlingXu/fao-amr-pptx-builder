@@ -120,11 +120,14 @@ class PlanStore:
             return self._public(self._get(plan_id, owner))
 
     def revise(self, owner: str, plan_id: str, expected_revision: int,
-               sections: list[dict], template_id: str | None) -> dict:
-        if template_id is not None:
-            self.templates.get(template_id, owner)
+               sections: list[dict], template_id: str | None,
+               template_provided: bool = False) -> dict:
         with self._lock:
             old = self._get(plan_id, owner)
+            if not template_provided:
+                template_id = old["templateId"]
+            if template_id is not None:
+                self.templates.get(template_id, owner)
             if old["revision"] != expected_revision:
                 raise PlanConflict("Plan changed. Retrieve the latest revision and confirm again.")
             sources = self._validate_slides(sections)
