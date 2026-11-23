@@ -67,3 +67,9 @@ SharePoint `webUrl` 使用输出目录已有权限；`downloadUrl` 是需认证�
 Publish 后添加 Teams 渠道，先安装到一对一会话试用。先分享 Agent 使用权限，再提供安装链接。组织目录分发按 CSI 审批流程执行；Agent 权限、安装权限和文档权限分别验证。参见 [微软 Teams 发布说明](https://learn.microsoft.com/en-us/microsoft-copilot-studio/publication-add-bot-to-microsoft-teams)。
 
 记录实际验收结果、维护人与费用负责人后，再宣布组织可用。
+
+## V2：故事线规划和多轮修改
+
+在已有的六个工具之外，新增 `PlanPresentation`、`GetPresentationPlan`、`RevisePresentationPlan`、`CreateDraftFromPlan` 四个工具。用户提出演示需求时，Copilot Studio 先按受众和用途拟定章节（标题、检索词、预计页数），调用 `PlanPresentation` 将实际匹配到的幻灯片及来源记录为方案。用户要求增减章节、改变重点或顺序时，先读取当前版本，再用完整选页清单及 `expected_revision` 修订。只允许使用搜索接口返回的真实幻灯片 ID。若资料不足，展示 `gap`，不得编造缺失页面。
+
+**生成前须再次明确确认最新的 planId、revision、选页顺序及模板。** 把 `CreateDraftFromPlan` 的动态调用关闭，开启 Ask the end user before running；不要让 AI 自行填写 `confirmed=true`。提交后查询 `GetDraftStatus`，成功后显示返回的 SharePoint webUrl。新增的 `integrations/copilot-studio/flow-design.json` V2 节点是配置蓝图，不能直接导入为 Agent。完整流程、示例和限制见 [V2 中文指南](V2_WORKFLOW_CN.md)。
