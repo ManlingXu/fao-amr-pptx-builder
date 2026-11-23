@@ -51,3 +51,7 @@ Azure 部署脚本要求持久目录是 `/home/data/ppt-assistant/` 下的非空
 CSI 根据实际组织协议确认 Copilot Studio 资格／容量、自定义连接器政策及后台计算／存储费用。本说明不假定价格或免费资格。后台不调用独立 LLM 或向量搜索服务。见 [微软许可说明](https://learn.microsoft.com/en-us/microsoft-copilot-studio/billing-licensing)。
 
 发布前按 [验收清单](ACCEPTANCE.md) 使用两位真实用户、真实源／输出目录和代表性文件，在桌面 PowerPoint 中检查。再按 [Copilot Studio 配置](COPILOT_STUDIO_CN.md) 完成发布。本地测试与模拟 Graph 响应不能证明真实租户权限已开通。
+
+## V2 规划数据与 Agent 配置
+
+V2 会在 `DRAFTS_PATH/plans/` 保存属于具体请求者的章节规划、选页和版本号。CSI 应把它与任务文件、上传模板一并纳入持久存储、保留期、备份和访问控制。V2 的 Python 代码不需要新增独立 LLM、向量数据库或 Azure 产品，但**四个新增接口不会因 GitHub 更新而自动出现在 Copilot Studio Agent 中**。需要在批准环境导入连接器、按照 [V2 指南](V2_WORKFLOW_CN.md) 配置主题变量、保存当前 revision，用户明确确认最新选页与模板后才允许调用 `CreateDraftFromPlan`。请用两个真实账号验证权限、版本冲突、持久存储及授权费用。
