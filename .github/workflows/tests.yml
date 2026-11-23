@@ -3,7 +3,7 @@ name: Core workflow tests
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, feature/v2-storyline-planning]
   workflow_dispatch:
 
 permissions:
