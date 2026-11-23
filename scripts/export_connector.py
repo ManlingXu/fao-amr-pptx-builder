@@ -50,6 +50,46 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
         "template":{**template,"x-nullable":True},
         "sourceJobId":{"type":"string","x-nullable":True}
     }}
+    plan_proposed_section = {"type":"object","required":["title","query","slide_count"],
+      "properties":{"title":{"type":"string","minLength":1,"maxLength":120},
+        "query":{"type":"string","minLength":1,"maxLength":400},
+        "slide_count":{"type":"integer","minimum":1,"maximum":8},
+        "notes":{"type":"string","maxLength":600}}}
+    plan_section = {"type":"object","properties":{
+        "title":{"type":"string"},"query":{"type":"string"},
+        "notes":{"type":"string"},"slideIds":{"type":"array","items":{"type":"string"}},
+        "requestedSlides":{"type":"integer"},"gap":{"type":"boolean"}}}
+    plan_request = {"type":"object","required":["title","audience","purpose","sections"],"properties":{
+        "title":{"type":"string","minLength":1,"maxLength":120},
+        "audience":{"type":"string","minLength":1,"maxLength":200},
+        "purpose":{"type":"string","minLength":1,"maxLength":500},
+        "sections":{"type":"array","minItems":1,"maxItems":8,
+                    "items":{"$ref":"#/definitions/ProposedSection"}},
+        "template_id":{**template_id,"x-nullable":True}}}
+    revision_section = {"type":"object","required":["title","query"],"properties":{
+        "title":{"type":"string","minLength":1,"maxLength":120},
+        "query":{"type":"string","minLength":1,"maxLength":400},
+        "slide_ids":{"type":"array","maxItems":20,
+                    "items":{"type":"string","minLength":1,"maxLength":128}},
+        "notes":{"type":"string","maxLength":600}}}
+    revise_request = {"type":"object","required":["expected_revision","sections"],"properties":{
+        "expected_revision":{"type":"integer","minimum":1},
+        "sections":{"type":"array","minItems":1,"maxItems":8,
+                    "items":{"$ref":"#/definitions/RevisionSection"}},
+        "template_id":{**template_id,"x-nullable":True,
+                       "description":"Omit to keep the current template, null to clear it"}}}
+    finalize_request = {"type":"object","required":["expected_revision","confirmed"],"properties":{
+        "expected_revision":{"type":"integer","minimum":1},
+        "confirmed":{"type":"boolean","enum":[True],
+                     "description":"Set only after explicit approval of this exact revision"}}}
+    plan_result = {"type":"object","properties":{
+        "planId":{"type":"string"},"revision":{"type":"integer"},
+        "title":{"type":"string"},"audience":{"type":"string"},"purpose":{"type":"string"},
+        "templateId":{**template_id,"x-nullable":True},
+        "sections":{"type":"array","items":{"$ref":"#/definitions/PlanSection"}},
+        "sourceMap":{"type":"array","items":{"$ref":"#/definitions/SourceMapEntry"}},
+        "needsReview":{"type":"boolean"},"requiresUserConfirmation":{"type":"boolean"},
+        "isReadyForDraft":{"type":"boolean"}}}
     if auth == "api-key":
         security = {"ApiKey":{"type":"apiKey","in":"header","name":"X-API-Key"}}
         requirement = [{"ApiKey":[]}]
@@ -95,8 +135,8 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
     body=lambda schema:[{"name":"body","in":"body","required":True,"schema":schema}]
     path=lambda name:[{"name":name,"in":"path","required":True,"type":"string"}]
     return {
-      "swagger":"2.0","info":{"title":"Presentation Assistant","version":"1.1.0",
-      "description":"Search existing slides, upload a PowerPoint template, create and restyle editable drafts."},
+      "swagger":"2.0","info":{"title":"Presentation Assistant","version":"1.2.0",
+      "description":"Search source slides, plan and revise storylines, confirm drafts and apply templates."},
       "host":url.netloc,"basePath":url.path.rstrip("/") or "/","schemes":["https"],
       "consumes":["application/json"],"produces":["application/json"],
       "securityDefinitions":security,"security":requirement,
@@ -107,10 +147,18 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
           {"type":"object","properties":{"slideId":{"type":"string"},"versions":{"type":"array","items":{"$ref":"#/definitions/Slide"}}}})},
         "/api/templates":{"post":operation("UploadTemplate","Upload a chat attachment as a PowerPoint template",body(upload_request),{"$ref":"#/definitions/Template"},"201")},
         "/api/drafts/{job_id}/template":{"post":operation("ApplyTemplate","Apply an uploaded template to a completed draft",path("job_id")+body(apply_request),{"$ref":"#/definitions/Job"},"202")},
+        "/api/plans":{"post":operation("PlanPresentation","Propose a structured storyline grounded in approved slide searches",body(plan_request),{"$ref":"#/definitions/Plan"},"201")},
+        "/api/plans/{plan_id}":{
+          "get":operation("GetPresentationPlan","Retrieve the current owner-scoped storyline and revision",path("plan_id"),{"$ref":"#/definitions/Plan"}),
+          "put":operation("RevisePresentationPlan","Replace sections and ordered slide IDs using a known revision",path("plan_id")+body(revise_request),{"$ref":"#/definitions/Plan"})},
+        "/api/plans/{plan_id}/draft":{
+          "post":operation("CreateDraftFromPlan","Create a PPT after confirming an exact storyline revision",path("plan_id")+body(finalize_request),{"$ref":"#/definitions/Job"},"202")},
         "/api/drafts":{"post":operation("CreateDraft","Create a draft after user confirmation",body(draft_request),{"$ref":"#/definitions/Job"},"202")},
         "/api/drafts/{job_id}":{"get":operation("GetDraftStatus","Check draft status and file link",path("job_id"),{"$ref":"#/definitions/Job"})}
       },
-      "definitions":{"Slide":slide,"SourceMapEntry":provenance,"Job":job,"Template":template}
+      "definitions":{"Slide":slide,"SourceMapEntry":provenance,"Job":job,"Template":template,
+                     "ProposedSection":plan_proposed_section,"RevisionSection":revision_section,
+                     "PlanSection":plan_section,"Plan":plan_result}
     }
 
 def main():
