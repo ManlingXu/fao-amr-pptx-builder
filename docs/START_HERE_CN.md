@@ -48,3 +48,7 @@ CSI 按 [交接清单](CSI_HANDOFF_CN.md) 提供可用环境、Entra 身份、Gr
 - 资料输入为 PPTX，模板为 PPTX/POTX；没有 PDF/DOCX 导入、独立聊天界面或额外模型。
 - Teams 返回 SharePoint `webUrl`；它遵循输出文件夹现有权限。API `downloadUrl` 需要认证，不能当作普通匿名下载链接。
 - 一台实例、一个服务进程，生产配置使用 Entra。详细限制见 [验收清单](ACCEPTANCE.md)。
+
+## V2 继续开发
+
+核心后台现已加入保存故事线、多轮调整章节和顺序、按最新确认版本生成 PPT 的能力。仍需在 Copilot Studio 实际配置对话主题。开始操作请看 [V2 中文指南](V2_WORKFLOW_CN.md) 和 [Copilot Studio 配置](COPILOT_STUDIO_CN.md)。
