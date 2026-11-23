@@ -13,6 +13,8 @@ from pptx import Presentation
 from presentation_search.api import create_app
 from presentation_search.auth import Identity
 from presentation_search.config import Settings
+from presentation_search.plans import PlanStore
+from presentation_search.templates import TemplateStore
 
 
 def deck(path, title, body):
@@ -71,6 +73,10 @@ def test_plan_creates_grounded_storyline_and_completes_draft(client):
     assert "owner" not in plan
     plan_id = plan["planId"]
     assert client.get(f"/api/plans/{plan_id}").json() == plan
+    # The plan is physically persisted and can be read by a new store instance.
+    storage = client.app.state.settings.drafts_path
+    new_store = PlanStore(storage / "plans", client.app.state.index, TemplateStore(storage / "templates"))
+    assert new_store.get("alice", plan_id) == plan
 
     # No generation until confirmation.
     failed = client.post(f"/api/plans/{plan_id}/draft",
@@ -191,8 +197,23 @@ def test_plan_template_id_must_belong_to_requester(client):
     assert denied.status_code == 404
     p = allowed.json()
     assert p["templateId"] == template_id
+    # A follow-up that changes only slide order should retain the template.
+    all_slides = [sid for sec in p["sections"] for sid in sec["slideIds"]]
+    updated = client.put(f"/api/plans/{p['planId']}", json={
+        "expected_revision": 1,
+        "sections": [{"title": "Rearranged", "query": "AMR", "slide_ids": all_slides}],
+    })
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["templateId"] == template_id
+    # Explicit null means "remove template", not "keep it".
+    cleared = client.put(f"/api/plans/{p['planId']}", json={
+        "expected_revision": 2, "template_id": None,
+        "sections": [{"title": "Rearranged", "query": "AMR", "slide_ids": all_slides}],
+    })
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["templateId"] is None
     assert client.put(f"/api/plans/{p['planId']}", json={
-        "expected_revision": 1, "template_id": "0" * 32,
+        "expected_revision": 3, "template_id": "0" * 32,
         "sections": [{"title": "AMR", "query": "AMR",
                       "slide_ids": [p["sections"][0]["slideIds"][0]]}],
     }).status_code == 404
