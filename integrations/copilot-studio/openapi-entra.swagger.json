@@ -2,8 +2,8 @@
   "swagger": "2.0",
   "info": {
     "title": "Presentation Assistant",
-    "version": "1.1.0",
-    "description": "Search existing slides, upload a PowerPoint template, create and restyle editable drafts."
+    "version": "1.2.0",
+    "description": "Search source slides, plan and revise storylines, confirm drafts and apply templates."
   },
   "host": "api.example.invalid",
   "basePath": "/",
@@ -234,6 +234,224 @@
                     true
                   ],
                   "description": "True only when user explicitly requests this template for this completed draft"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Job"
+            }
+          },
+          "default": {
+            "description": "Request rejected or operation failed",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/api/plans": {
+      "post": {
+        "operationId": "PlanPresentation",
+        "summary": "Propose a structured storyline grounded in approved slide searches",
+        "x-ms-summary": "Propose a structured storyline grounded in approved slide searches",
+        "description": "Propose a structured storyline grounded in approved slide searches",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "title",
+                "audience",
+                "purpose",
+                "sections"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "audience": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "purpose": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "sections": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "items": {
+                    "$ref": "#/definitions/ProposedSection"
+                  }
+                },
+                "template_id": {
+                  "type": "string",
+                  "minLength": 32,
+                  "maxLength": 32,
+                  "pattern": "^[0-9a-f]{32}$",
+                  "description": "Exact templateId returned by UploadTemplate for this signed-in user",
+                  "x-nullable": true
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Plan"
+            }
+          },
+          "default": {
+            "description": "Request rejected or operation failed",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{plan_id}": {
+      "get": {
+        "operationId": "GetPresentationPlan",
+        "summary": "Retrieve the current owner-scoped storyline and revision",
+        "x-ms-summary": "Retrieve the current owner-scoped storyline and revision",
+        "description": "Retrieve the current owner-scoped storyline and revision",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Plan"
+            }
+          },
+          "default": {
+            "description": "Request rejected or operation failed",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "RevisePresentationPlan",
+        "summary": "Replace sections and ordered slide IDs using a known revision",
+        "x-ms-summary": "Replace sections and ordered slide IDs using a known revision",
+        "description": "Replace sections and ordered slide IDs using a known revision",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "expected_revision",
+                "sections"
+              ],
+              "properties": {
+                "expected_revision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "sections": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "items": {
+                    "$ref": "#/definitions/RevisionSection"
+                  }
+                },
+                "template_id": {
+                  "type": "string",
+                  "minLength": 32,
+                  "maxLength": 32,
+                  "pattern": "^[0-9a-f]{32}$",
+                  "description": "Omit to keep the current template, null to clear it",
+                  "x-nullable": true
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Plan"
+            }
+          },
+          "default": {
+            "description": "Request rejected or operation failed",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{plan_id}/draft": {
+      "post": {
+        "operationId": "CreateDraftFromPlan",
+        "summary": "Create a PPT after confirming an exact storyline revision",
+        "x-ms-summary": "Create a PPT after confirming an exact storyline revision",
+        "description": "Create a PPT after confirming an exact storyline revision",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "expected_revision",
+                "confirmed"
+              ],
+              "properties": {
+                "expected_revision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "confirmed": {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ],
+                  "description": "Set only after explicit approval of this exact revision"
                 }
               }
             }
@@ -558,6 +776,142 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "ProposedSection": {
+      "type": "object",
+      "required": [
+        "title",
+        "query",
+        "slide_count"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "slide_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 600
+        }
+      }
+    },
+    "RevisionSection": {
+      "type": "object",
+      "required": [
+        "title",
+        "query"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "slide_ids": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 600
+        }
+      }
+    },
+    "PlanSection": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "slideIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedSlides": {
+          "type": "integer"
+        },
+        "gap": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Plan": {
+      "type": "object",
+      "properties": {
+        "planId": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "audience": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 32,
+          "pattern": "^[0-9a-f]{32}$",
+          "description": "Exact templateId returned by UploadTemplate for this signed-in user",
+          "x-nullable": true
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PlanSection"
+          }
+        },
+        "sourceMap": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceMapEntry"
+          }
+        },
+        "needsReview": {
+          "type": "boolean"
+        },
+        "requiresUserConfirmation": {
+          "type": "boolean"
+        },
+        "isReadyForDraft": {
+          "type": "boolean"
         }
       }
     }
