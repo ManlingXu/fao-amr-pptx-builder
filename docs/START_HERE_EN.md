@@ -40,3 +40,7 @@ Use one approved source library whose entire contents are available to every pil
 - Source inputs are PPTX, templates are PPTX/POTX. No PDF/DOCX ingestion, standalone chat UI or extra model is included.
 - Return the SharePoint `webUrl` in Teams; destination-folder permissions apply. The API `downloadUrl` requires authentication.
 - Use one instance and one service process, with Entra for production. See [acceptance](ACCEPTANCE.md) for the supported file and deployment limits.
+
+## V2 planning workflow
+
+The repository now includes a revisioned presentation-plan backend: grounded section planning, multi-turn section/slide edits, and draft creation after approval of the latest revision. The Copilot Studio dialog must still be configured in an approved tenant. See [V2 workflow](V2_WORKFLOW_EN.md) and [Copilot setup](COPILOT_STUDIO_EN.md).
