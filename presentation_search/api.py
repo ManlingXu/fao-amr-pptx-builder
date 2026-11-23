@@ -21,6 +21,7 @@ from .auth import Identity, key_matches
 from .config import Settings, get_settings
 from .indexer import rebuild_index
 from .jobs import MIME, DraftJobs, provenance, safe_title
+from .plans import PlanStore, PlanConflict
 from .providers.local import LocalKnowledgeProvider
 from .providers.sharepoint import SharePointKnowledgeProvider
 from .search import SearchIndex
@@ -47,6 +48,54 @@ class ApplyTemplateRequest(BaseModel):
     def require_confirmation(cls, value):
         if not value:
             raise ValueError("Explicit confirmation is required")
+        return value
+
+
+
+class PlanSectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: Title
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=400)]
+    slide_count: int = Field(ge=1, le=8)
+    notes: str = Field(default="", max_length=600)
+
+
+class PlanCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: Title
+    audience: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    purpose: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+    sections: list[PlanSectionRequest] = Field(min_length=1, max_length=8)
+    template_id: TemplateId | None = None
+
+
+class PlanRevisionSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: Title
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=400)]
+    slide_ids: list[Annotated[str, StringConstraints(min_length=1, max_length=128)]] = Field(
+        default_factory=list, max_length=20
+    )
+    notes: str = Field(default="", max_length=600)
+
+
+class PlanRevisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(ge=1)
+    sections: list[PlanRevisionSection] = Field(min_length=1, max_length=8)
+    template_id: TemplateId | None = None
+
+
+class PlanFinalizeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(ge=1)
+    confirmed: StrictBool
+
+    @field_validator("confirmed")
+    @classmethod
+    def require_confirmation(cls, value):
+        if not value:
+            raise ValueError("Confirm the exact current plan revision before generating a draft")
         return value
 
 
@@ -116,6 +165,7 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
     identity = Identity(settings)
     jobs = DraftJobs(settings.drafts_path, provider)
     templates = TemplateStore(settings.drafts_path / "templates")
+    plans = PlanStore(settings.drafts_path / "plans", active_index, templates)
     indexing = Lock()
 
     @asynccontextmanager
@@ -128,15 +178,17 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
         if index is None:
             rebuild_index(provider, active_index)
         jobs.start()
+        plans.start()
         try:
             yield
         finally:
             jobs.stop()
 
-    app = FastAPI(title="Teams Presentation Assistant", version="1.1.0", lifespan=lifespan)
+    app = FastAPI(title="Teams Presentation Assistant", version="1.2.0", lifespan=lifespan)
     app.state.index = active_index
     app.state.provider = provider
     app.state.settings = settings
+    app.state.plans = plans
     auth = Depends(identity.principal)
 
     @app.get("/health")
@@ -159,6 +211,58 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
         except KeyError:
             raise HTTPException(404, "Slide not found") from None
         return {"slideId": slide_id, "versions": [provenance(s) for s in matched]}
+
+    @app.post("/api/plans", status_code=201)
+    def create_plan(request: PlanCreateRequest, owner: str = auth):
+        sections = [{"title": s.title, "query": s.query,
+                     "slideCount": s.slide_count, "notes": s.notes}
+                    for s in request.sections]
+        try:
+            return plans.create(owner, request.title, request.audience, request.purpose,
+                                sections, request.template_id)
+        except KeyError:
+            raise HTTPException(404, "Template not found for this user") from None
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.get("/api/plans/{plan_id}")
+    def get_plan(plan_id: str, owner: str = auth):
+        try:
+            return plans.get(owner, plan_id)
+        except KeyError:
+            raise HTTPException(404, "Plan not found") from None
+
+    @app.put("/api/plans/{plan_id}")
+    def revise_plan(plan_id: str, request: PlanRevisionRequest, owner: str = auth):
+        sections = [{"title": s.title, "query": s.query,
+                     "slideIds": s.slide_ids, "notes": s.notes}
+                    for s in request.sections]
+        try:
+            return plans.revise(owner, plan_id, request.expected_revision,
+                                sections, request.template_id)
+        except KeyError:
+            raise HTTPException(404, "Plan or template not found for this user") from None
+        except PlanConflict as exc:
+            raise HTTPException(409, str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.post("/api/plans/{plan_id}/draft", status_code=202)
+    def create_plan_draft(plan_id: str, request: PlanFinalizeRequest, owner: str = auth):
+        def submit(plan, slides):
+            template = owned_template(plan["templateId"], owner) if plan["templateId"] else None
+            return jobs.submit(owner, plan["title"], slides, template)
+
+        try:
+            return plans.submit_draft(owner, plan_id, request.expected_revision, submit)
+        except KeyError:
+            raise HTTPException(404, "Plan or template not found") from None
+        except PlanConflict as exc:
+            raise HTTPException(409, str(exc)) from None
+        except OverflowError:
+            raise HTTPException(429, "Draft queue is busy. Try again shortly.") from None
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
 
     @app.get("/api/slides/{slide_id}/source", dependencies=[auth])
     def local_source(slide_id: str):
