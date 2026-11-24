@@ -119,11 +119,26 @@ class SearchIndex:
                 )
             )
         candidates.sort(key=lambda r: (r.final_score, date_order(r.slide), r.slide.id), reverse=True)
+        # Explain only the returned pages. These terms are ordered by the same
+        # corpus weights used for scoring, with a stable order for equal weights.
+        by_weight = sorted(weights, key=lambda t: (-weights[t], t))
         seen = set()
         result = []
         for item in candidates:
             if latest_only and item.slide.family_key in seen:
                 continue
+            slide = item.slide
+            title = set(tokenize(slide.title))
+            content = set(tokenize(f"{slide.text} {slide.notes}"))
+            source = set(tokenize(f"{slide.deck_name} {slide.deck_title}"))
+            for label, tokens in (
+                ("Slide title", title),
+                ("Slide text or notes", content - title),
+                ("Source name only", source - (title | content)),
+            ):
+                matched = [term for term in by_weight if term in tokens]
+                if matched:
+                    item.explanation.append(f"{label}: {', '.join(matched)}")
             result.append(item)
             seen.add(item.slide.family_key)
             if len(result) == max(1, min(limit, 15)):

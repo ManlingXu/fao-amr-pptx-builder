@@ -138,7 +138,7 @@ def test_interactive_review_exports_exact_candidate_ranks_in_selected_order(tmp_
     files = tmp_path / "presentations"
     files.mkdir()
     manifest(tmp_path, [write_deck(files, "a", ["Feed nutrition", "Feed planning", "Feed monitoring"])])
-    answers = iter(["2,1", "yes"])
+    answers = iter(["why 99", "why 2", "2,1", "yes"])
     monkeypatch.setattr("builtins.input", lambda _: next(answers))
     result = run_demo(tmp_path, tmp_path / "out", ["feed"], interactive=True)
     assert result["status"] == "completed"
@@ -149,6 +149,7 @@ def test_interactive_review_exports_exact_candidate_ranks_in_selected_order(tmp_
     assert len(result["interactive_rejections"]) == 0
     output = capsys.readouterr().out
     assert "Revision 2" in output and "Source a · original slide" in output
+    assert "candidate number" in output and "Slide title: feed" in output and "Relevance " in output
 
 
 @pytest.mark.parametrize("answers", [["", "no"], ["", ""], ["", None], [None]])

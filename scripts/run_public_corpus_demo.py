@@ -183,11 +183,24 @@ def review_candidates(searches, sections, presentations, work):
             continue
         suggested = ",".join(suggestions) or "none"
         while True:
-            answer = ask(f"Ranks in output order [suggested: {suggested}], 'none', or 'preview': ")
+            answer = ask(f"Ranks in output order [suggested: {suggested}], 'why N', 'none', or 'preview': ")
             if answer is None or answer.lower() == "preview":
                 finished = False
                 break
             answer = answer or suggested
+            command = answer.lower().split()
+            if command[:1] == ["why"]:
+                ranks = {str(n): hit for n, hit in enumerate(hits, 1)}
+                if len(command) != 2 or command[1] not in ranks:
+                    print("Enter 'why' followed by a candidate number shown above.")
+                    continue
+                hit = ranks[command[1]]
+                print(source_label(hit))
+                print(f"  Relevance {hit['relevanceScore']:.3f}, freshness {hit['freshnessScore']:.3f}, "
+                      f"final {hit['finalScore']:.3f}")
+                for reason in hit["explanation"]:
+                    print(f"  {reason}")
+                continue
             if answer.lower() == "none":
                 break
             try:

@@ -1,6 +1,8 @@
 import csv
+import json
 from email.message import Message
 from io import BytesIO
+from types import SimpleNamespace
 
 import pytest
 
@@ -71,7 +73,7 @@ def test_command_only_fetches_source_page_and_preserves_last_output_on_failure(t
         response.headers = Message()
         return response
 
-    monkeypatch.setattr(discovery, "urlopen", open_page)
+    monkeypatch.setattr(discovery, "build_opener", lambda handler: SimpleNamespace(open=open_page))
     discovery.main(["--catalog", str(catalog)])
     with output.open(newline="", encoding="utf-8") as stream:
         assert list(csv.DictReader(stream))[0]["status"] == "candidate_unreviewed"
@@ -80,3 +82,95 @@ def test_command_only_fetches_source_page_and_preserves_last_output_on_failure(t
         discovery.main(["--catalog", str(catalog)])
     assert output.read_bytes() == previous
     assert urls == [discovery.LIBRARY_URL, discovery.LIBRARY_URL]
+
+
+def test_partial_scan_preserves_snapshots_and_resumes_only_failed_sources(tmp_path, monkeypatch):
+    catalog = tmp_path / "catalog.csv"
+    catalog.write_text("id,download_url\n", encoding="utf-8")
+    runs = tmp_path / "scans"
+    calls = []
+
+    def scan_source(source, listed, stats):
+        calls.append(source)
+        stats["pages_requested"] += 1
+        if source == "uk-varss" and calls.count(source) == 1:
+            raise TimeoutError("publisher timed out")
+        if source == "cgiar":
+            return []
+        return [{"status": "candidate_unreviewed", "catalog_id": "", "country": "", "section": "",
+                 "title": source, "source_page": f"https://example.org/{source}",
+                 "download_url": f"https://example.org/files/{source}.pptx"}]
+
+    monkeypatch.setattr(discovery, "scan_source", scan_source)
+    options = ["--catalog", str(catalog), "--output-dir", str(runs)]
+    with pytest.raises(SystemExit):
+        discovery.main([*options, "--source", "all"])
+    [incomplete] = runs.iterdir()
+    report = json.loads((incomplete / "report.json").read_text())
+    assert not report["complete"] and not (incomplete / "candidates.csv").exists()
+    assert [report["sources"][s]["status"] for s in discovery.SOURCE_HOSTS] == ["ok", "failed", "empty"]
+    assert "timed out" in report["sources"]["uk-varss"]["error"]
+    assert (incomplete / "cgiar.csv").read_text().count("\n") == 1
+
+    discovery.main([*options, "--resume", str(incomplete)])
+    [finished] = set(runs.iterdir()) - {incomplete}
+    assert calls == ["eu-training", "uk-varss", "cgiar", "uk-varss"]
+    report = json.loads((finished / "report.json").read_text())
+    assert report["complete"] and report["sources"]["eu-training"]["pages_requested"] == 0
+    with (finished / "candidates.csv").open(newline="") as stream:
+        assert [row["source"] for row in csv.DictReader(stream)] == ["eu-training", "uk-varss"]
+    (finished / "uk-varss.csv").write_text("damaged snapshot")
+    discovery.main([*options, "--resume", str(finished)])
+    assert calls.count("uk-varss") == 3
+    assert calls.count("eu-training") == calls.count("cgiar") == 1
+    catalog.write_text("id,download_url\nnew,https://example.org/x.pptx\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="catalog changed"):
+        discovery.scan(catalog, None, runs, incomplete)
+
+
+def test_source_matching_uses_file_identity_and_keeps_distinct_api_queries(tmp_path):
+    catalog = tmp_path / "catalog.csv"
+    catalog.write_text("id,download_url,zip_member\n"
+                       "first,https://example.org/dl?id=1,\n"
+                       "archived,https://example.org/collection.zip,file.pptx\n", encoding="utf-8")
+    candidates = [{"title": "same", "download_url": url} for url in [
+        "https://example.org/dl?id=1#s1", "https://example.org/dl?id=1#s2", "https://example.org/dl?id=2",
+    ]]
+    listed, _ = discovery.load_catalog(catalog)
+    result = discovery.label_rows(candidates, listed)
+    assert [(r["status"], r["catalog_id"]) for r in result] == [("listed", "first"), ("candidate_unreviewed", "")]
+    assert "https://example.org/collection.zip" not in listed
+
+
+def test_publisher_redirects_cannot_cross_source_boundaries():
+    handler = discovery.PublisherRedirects({"cgspace.cgiar.org"})
+    for url in ("https://external.example/", "https://cgspace.cgiar.org@example.org/",
+                "http://cgspace.cgiar.org/items", "https://cgspace.cgiar.org:444/items"):
+        with pytest.raises(ValueError, match="Redirect"):
+            handler.redirect_request(None, None, 302, "", None, url)
+
+
+def test_page_fetch_retries_temporary_errors_and_respects_publisher_backoff(monkeypatch):
+    waits = []
+    monkeypatch.setattr(discovery.time, "sleep", waits.append)
+    headers = Message()
+    headers["Retry-After"] = "2"
+    response = BytesIO(b"success")
+    response.headers = Message()
+    results = [discovery.HTTPError("https://example.org", 503, "busy", headers, None), response]
+
+    def next_page(request, timeout):
+        result = results.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    opener = SimpleNamespace(open=next_page)
+    stats = {"request_attempts": 0}
+    assert discovery.read_page(opener, "https://example.org", stats) == "success"
+    assert stats["request_attempts"] == 2 and waits == [2]
+    headers.replace_header("Retry-After", "120")
+    results.append(discovery.HTTPError("https://example.org", 429, "wait", headers, None))
+    with pytest.raises(discovery.HTTPError):
+        discovery.read_page(opener, "https://example.org", stats)
+    assert stats["request_attempts"] == 3 and waits == [2]
