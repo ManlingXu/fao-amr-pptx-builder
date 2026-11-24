@@ -1,7 +1,7 @@
 {
   "type": "configuration-blueprint",
   "importableSolution": false,
-  "version": "2.0",
+  "version": "3.0",
   "topic": "Create a draft from existing slides",
   "steps": [
     {
@@ -100,6 +100,218 @@
       "allowDynamicUse": false,
       "inputBinding": "Bind owned completed job_id and uploaded template_id after an explicit user request. Do not add redundant confirmation when intent and target are clear."
     }
+  },
+  "aiPromptBlueprints": {
+    "status": "manual configuration blueprints only; not imported or activated by this repository",
+    "presentationBrief": "ai-prompts/presentation-brief.json",
+    "queryExpansion": "ai-prompts/query-expansion.json",
+    "candidateReranking": "ai-prompts/candidate-reranking.json",
+    "layoutDecision": "ai-prompts/layout-decision.json",
+    "requiredOutputHandling": [
+      "Configure every prompt for JSON output using the schema in its blueprint.",
+      "Validate prompt output before using it as a tool input.",
+      "Never allow a prompt to invent a slide ID or a template layout name.",
+      "Keep the validated evidence snippet, selection reason, risks and coverage gap in topic variables for user review and audit."
+    ]
+  },
+  "smartAiWorkflow": {
+    "status": "design blueprint only: configure prompts, variables, loops, validation and tools manually in an approved Copilot Studio tenant",
+    "importableSolution": false,
+    "goal": "Use Copilot AI for storyline, query expansion, evidence-grounded reranking and constrained layout choice while Python performs deterministic PPTX operations.",
+    "steps": [
+      {
+        "id": "smart_collect",
+        "kind": "question",
+        "inputs": [
+          "user_request",
+          "audience",
+          "purpose",
+          "target_slide_count",
+          "reporting_period",
+          "constraints",
+          "response_language"
+        ]
+      },
+      {
+        "id": "smart_brief",
+        "kind": "prompt",
+        "blueprint": "ai-prompts/presentation-brief.json",
+        "output": "Topic.presentationBrief",
+        "validation": "JSON schema plus section slide counts must sum to target_slide_count; no source IDs are accepted from this prompt."
+      },
+      {
+        "id": "smart_expand_and_search",
+        "kind": "for-each-section",
+        "source": "Topic.presentationBrief.sections",
+        "actions": [
+          {
+            "kind": "prompt",
+            "blueprint": "ai-prompts/query-expansion.json",
+            "output": "Topic.sectionQueries"
+          },
+          {
+            "kind": "for-each-query-tool",
+            "operationId": "SearchSlides",
+            "input": {
+              "query": "current query-expansion output.query",
+              "limit": 15,
+              "latest_only": true
+            },
+            "output": "Topic.rawCandidates"
+          },
+          {
+            "kind": "deterministic-transform",
+            "action": "Union all query results and de-duplicate by exact slideId without rewriting candidate fields.",
+            "output": "Topic.uniqueCandidates"
+          },
+          {
+            "kind": "prompt",
+            "blueprint": "ai-prompts/candidate-reranking.json",
+            "input": "Current section goal, requested count, constraints and Topic.uniqueCandidates",
+            "output": "Topic.sectionSelection"
+          },
+          {
+            "kind": "validation",
+            "checks": [
+              "Every selected slide_id occurs exactly once in Topic.uniqueCandidates.",
+              "Every evidence_snippet is copied from the matching title or snippet.",
+              "Selected count does not exceed the current section's requested slide count."
+            ],
+            "onFailure": "Do not persist or draft. Rerun with the validation error or ask the user to choose from the grounded candidate list."
+          }
+        ],
+        "output": "Topic.validatedSelections with exact IDs, evidence, reasons, risks and coverage gaps"
+      },
+      {
+        "id": "smart_initial_plan",
+        "kind": "tool",
+        "operationId": "PlanPresentation",
+        "input": {
+          "title": "Topic.presentationBrief.title",
+          "audience": "Topic.presentationBrief.audience",
+          "purpose": "Topic.presentationBrief.purpose",
+          "sections": "Section titles, canonical English queries, requested counts and goals from validated prompt output",
+          "template_id": "omit on the smart-layout route; apply the selected template after source draft creation"
+        },
+        "output": "Topic.initialPlan"
+      },
+      {
+        "id": "smart_persist_reranking",
+        "kind": "tool",
+        "operationId": "RevisePresentationPlan",
+        "input": {
+          "plan_id": "Topic.initialPlan.planId",
+          "expected_revision": "Topic.initialPlan.revision",
+          "sections": "Full section list with the exact validated reranked slide IDs in output order; retain selection reasons in topic audit variables"
+        },
+        "output": "Topic.rerankedPlan",
+        "note": "The initial PlanPresentation search is deterministic. This revision is required for the prompt reranking to control the saved selection."
+      },
+      {
+        "id": "smart_analyze_slides",
+        "kind": "tool",
+        "operationId": "AnalyzeSlides",
+        "input": {
+          "slide_ids": "Exact ordered slide IDs from Topic.rerankedPlan"
+        },
+        "output": "Topic.slideAnalyses",
+        "note": "Structural analysis only; picture count is not image relevance or visual understanding."
+      },
+      {
+        "id": "smart_optional_template",
+        "kind": "conditional-topic",
+        "when": "The user supplied or requested a PowerPoint template",
+        "topic": "Upload and apply a PowerPoint template",
+        "output": "Topic.template with exact templateId and layoutNames"
+      },
+      {
+        "id": "smart_layout_decision",
+        "kind": "conditional-prompt",
+        "when": "Topic.template exists",
+        "blueprint": "ai-prompts/layout-decision.json",
+        "input": "Presentation goal, exact Topic.template.layoutNames, Topic.slideAnalyses and validated selection reasons",
+        "output": "Topic.layoutDecisions",
+        "validation": "Every slide ID must occur in Topic.slideAnalyses and every layout name must occur in Topic.template.layoutNames.",
+        "fallback": "If connector fields cannot accept validated overrides, retain decisions as review guidance and explicitly state they were not applied."
+      },
+      {
+        "id": "smart_review",
+        "kind": "message",
+        "content": "Show the story order, exact source file and page, copied evidence, selection reason, date uncertainty, coverage gap, structural analysis and proposed template action for every selected slide."
+      },
+      {
+        "id": "smart_confirm",
+        "kind": "question",
+        "required": "User explicitly approves the current planId, revision, exact source order and requested template treatment."
+      },
+      {
+        "id": "smart_create_source_draft",
+        "kind": "tool",
+        "operationId": "CreateDraftFromPlan",
+        "input": {
+          "plan_id": "Topic.rerankedPlan.planId",
+          "expected_revision": "Topic.rerankedPlan.revision",
+          "confirmed": true
+        },
+        "trigger": "Only after smart_confirm",
+        "output": "Topic.sourceDraftJob"
+      },
+      {
+        "id": "smart_source_status",
+        "kind": "tool",
+        "operationId": "GetDraftStatus",
+        "input": {
+          "job_id": "Topic.sourceDraftJob.jobId"
+        },
+        "onPending": "Wait for an explicit later check; do not call template processing against an incomplete job.",
+        "onCompleted": "Continue to template application when requested, otherwise use this as the final job."
+      },
+      {
+        "id": "smart_apply_template",
+        "kind": "conditional-tool",
+        "when": "Topic.template exists and the source draft is completed",
+        "operationId": "ApplyTemplate",
+        "input": {
+          "job_id": "Topic.sourceDraftJob.jobId",
+          "template_id": "Topic.template.templateId",
+          "confirmed": true,
+          "layout_overrides": "Deterministically map decisions[].output_order to layout_overrides[].output_slide and decisions[].layout_name to layout_overrides[].layout_name; discard action, rationale and review fields"
+        },
+        "output": "Topic.finalJob",
+        "note": "The backend assigns the exact chosen template layout and proportionally scales source geometry. A prompt action value of reflow is a human-review recommendation; semantic reflow is not executed."
+      },
+      {
+        "id": "smart_final_status",
+        "kind": "tool",
+        "operationId": "GetDraftStatus",
+        "input": {
+          "job_id": "Topic.finalJob.jobId when a template was applied, otherwise Topic.sourceDraftJob.jobId"
+        },
+        "onCompleted": "Continue to layout checks; do not deliver early."
+      },
+      {
+        "id": "smart_layout_report",
+        "kind": "tool",
+        "operationId": "GetLayoutReport",
+        "input": {
+          "job_id": "The completed final job ID"
+        },
+        "output": "Topic.layoutReport",
+        "note": "Report off-canvas, overlap and density heuristics as warnings, not proof of visual quality."
+      },
+      {
+        "id": "smart_deliver",
+        "kind": "message",
+        "content": "Return only the real completed webUrl, source map, selection audit, template decision status, layout warnings and the need for desktop PowerPoint review."
+      }
+    ],
+    "failureBoundaries": [
+      "No prompt output can authorize confirmed=true.",
+      "No unvalidated slide ID or layout name reaches a file-writing tool.",
+      "No image relevance claim is made from structural object counts.",
+      "No clean heuristic report is described as pixel-perfect design.",
+      "Prompt files and this workflow do not configure or publish a live tenant."
+    ]
   },
   "templateWorkflow": {
     "reference": "../../docs/TEMPLATE_WORKFLOW_EN.md",

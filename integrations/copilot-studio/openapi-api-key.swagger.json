@@ -2,8 +2,8 @@
   "swagger": "2.0",
   "info": {
     "title": "Presentation Assistant",
-    "version": "1.2.0",
-    "description": "Search source slides, plan and revise storylines, confirm drafts and apply templates."
+    "version": "1.3.0",
+    "description": "Search and structurally analyze source slides, plan and revise storylines, confirm drafts, apply exact template layouts and review layout risks."
   },
   "host": "api.example.invalid",
   "basePath": "/",
@@ -78,6 +78,68 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/definitions/Slide"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or operation failed",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/api/slides/analyze": {
+      "post": {
+        "operationId": "AnalyzeSlides",
+        "summary": "Inspect selected slide structure before layout decisions",
+        "x-ms-summary": "Inspect selected slide structure before layout decisions",
+        "description": "Inspect selected slide structure before layout decisions",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "slide_ids"
+              ],
+              "properties": {
+                "slide_ids": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "slides": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/SlideAnalysis"
+                  }
+                },
+                "limitations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
                   }
                 }
               }
@@ -226,6 +288,14 @@
                     true
                   ],
                   "description": "True only when user explicitly requests this template for this completed draft"
+                },
+                "layout_overrides": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "items": {
+                    "$ref": "#/definitions/LayoutOverride"
+                  },
+                  "description": "Optional AI-selected exact layout name for each 1-based output slide"
                 }
               }
             }
@@ -564,6 +634,36 @@
           }
         }
       }
+    },
+    "/api/drafts/{job_id}/layout-report": {
+      "get": {
+        "operationId": "GetLayoutReport",
+        "summary": "Review heuristic layout risks in a completed draft",
+        "x-ms-summary": "Review heuristic layout risks in a completed draft",
+        "description": "Review heuristic layout risks in a completed draft",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/LayoutReport"
+            }
+          },
+          "default": {
+            "description": "Request rejected or operation failed",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -738,6 +838,27 @@
         "sourceJobId": {
           "type": "string",
           "x-nullable": true
+        },
+        "layoutOverrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "outputSlide": {
+                "type": "integer"
+              },
+              "layoutName": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "appliedLayouts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-nullable": true
         }
       }
     },
@@ -904,6 +1025,199 @@
         },
         "isReadyForDraft": {
           "type": "boolean"
+        }
+      }
+    },
+    "SlideAnalysis": {
+      "type": "object",
+      "properties": {
+        "outputSlide": {
+          "type": "integer"
+        },
+        "slideId": {
+          "type": "string"
+        },
+        "deckName": {
+          "type": "string"
+        },
+        "slideNumber": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "reportDate": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "effectiveYear": {
+          "type": "integer",
+          "x-nullable": true
+        },
+        "dateConfidence": {
+          "type": "number"
+        },
+        "dateReason": {
+          "type": "string"
+        },
+        "sourceHash": {
+          "type": "string"
+        },
+        "wordCount": {
+          "type": "integer"
+        },
+        "occupancyRatio": {
+          "type": "number"
+        },
+        "textShapeCount": {
+          "type": "integer"
+        },
+        "pictureCount": {
+          "type": "integer"
+        },
+        "tableCount": {
+          "type": "integer"
+        },
+        "chartCount": {
+          "type": "integer"
+        },
+        "groupCount": {
+          "type": "integer"
+        },
+        "contentType": {
+          "type": "string",
+          "enum": [
+            "title",
+            "text",
+            "image",
+            "table",
+            "chart",
+            "mixed"
+          ]
+        },
+        "density": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "recommendedLayoutAction": {
+          "type": "string",
+          "enum": [
+            "reuse",
+            "reflow",
+            "review"
+          ]
+        }
+      }
+    },
+    "LayoutIssue": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "warning",
+            "error"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "shapeIndex": {
+          "type": "integer",
+          "x-nullable": true
+        },
+        "shapeName": {
+          "type": "string",
+          "x-nullable": true
+        }
+      }
+    },
+    "LayoutReport": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string"
+        },
+        "slideCount": {
+          "type": "integer"
+        },
+        "slideWidth": {
+          "type": "integer"
+        },
+        "slideHeight": {
+          "type": "integer"
+        },
+        "slides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slideNumber": {
+                "type": "integer"
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/LayoutIssue"
+                }
+              }
+            }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "slides": {
+              "type": "integer"
+            },
+            "issues": {
+              "type": "integer"
+            },
+            "errors": {
+              "type": "integer"
+            },
+            "warnings": {
+              "type": "integer"
+            },
+            "slidesNeedingReview": {
+              "type": "integer"
+            }
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "LayoutOverride": {
+      "type": "object",
+      "required": [
+        "output_slide",
+        "layout_name"
+      ],
+      "properties": {
+        "output_slide": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "layout_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
         }
       }
     }

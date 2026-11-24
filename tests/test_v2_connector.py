@@ -21,7 +21,7 @@ def test_checked_in_v2_connector_matches_exporter(auth):
         (ROOT / "integrations" / "copilot-studio" / name).read_text(encoding="utf-8")
     )
     assert checked_in == rendered, "Regenerate the checked-in Swagger from scripts/export_connector.py"
-    assert rendered["info"]["version"] == "1.2.0"
+    assert rendered["info"]["version"] == "1.3.0"
     assert set(TOOLS) <= {
         method["operationId"]
         for path in rendered["paths"].values()

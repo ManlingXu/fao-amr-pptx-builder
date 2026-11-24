@@ -31,6 +31,37 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
         "dateConfidence":{"type":"number"}, "dateReason":{"type":"string"},
         "sourceHash":{"type":"string"}
     }}
+    slide_analysis = {"type":"object","properties":{
+        **provenance["properties"],
+        "wordCount":{"type":"integer"}, "occupancyRatio":{"type":"number"},
+        "textShapeCount":{"type":"integer"}, "pictureCount":{"type":"integer"},
+        "tableCount":{"type":"integer"}, "chartCount":{"type":"integer"},
+        "groupCount":{"type":"integer"},
+        "contentType":{"type":"string","enum":["title","text","image","table","chart","mixed"]},
+        "density":{"type":"string","enum":["low","medium","high"]},
+        "recommendedLayoutAction":{"type":"string","enum":["reuse","reflow","review"]}
+    }}
+    layout_issue = {"type":"object","properties":{
+        "code":{"type":"string"},
+        "severity":{"type":"string","enum":["warning","error"]},
+        "reason":{"type":"string"},
+        "shapeIndex":{"type":"integer","x-nullable":True},
+        "shapeName":{"type":"string","x-nullable":True}
+    }}
+    layout_report = {"type":"object","properties":{
+        "jobId":{"type":"string"}, "slideCount":{"type":"integer"},
+        "slideWidth":{"type":"integer"}, "slideHeight":{"type":"integer"},
+        "slides":{"type":"array","items":{"type":"object","properties":{
+            "slideNumber":{"type":"integer"},
+            "issues":{"type":"array","items":{"$ref":"#/definitions/LayoutIssue"}}
+        }}},
+        "summary":{"type":"object","properties":{
+            "slides":{"type":"integer"}, "issues":{"type":"integer"},
+            "errors":{"type":"integer"}, "warnings":{"type":"integer"},
+            "slidesNeedingReview":{"type":"integer"}
+        }},
+        "limitations":{"type":"array","items":{"type":"string"}}
+    }}
     template = {"type":"object","properties":{
         "templateId":{"type":"string","pattern":"^[0-9a-f]{32}$"},
         "fileName":{"type":"string"}, "slideWidth":{"type":"integer"},
@@ -48,7 +79,11 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
         "warnings":{"type":"array","items":{"type":"string"}},
         "sourceMap":{"type":"array","items":{"$ref":"#/definitions/SourceMapEntry"}},
         "template":{**template,"x-nullable":True},
-        "sourceJobId":{"type":"string","x-nullable":True}
+        "sourceJobId":{"type":"string","x-nullable":True},
+        "layoutOverrides":{"type":"array","items":{"type":"object","properties":{
+            "outputSlide":{"type":"integer"},"layoutName":{"type":"string"}
+        }}},
+        "appliedLayouts":{"type":"array","items":{"type":"string"},"x-nullable":True}
     }}
     plan_proposed_section = {"type":"object","required":["title","query","slide_count"],
       "properties":{"title":{"type":"string","minLength":1,"maxLength":120},
@@ -130,19 +165,32 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
         "template_id":template_id,
         "title":{"type":"string","minLength":1,"maxLength":120,"x-nullable":True},
         "confirmed":{"type":"boolean","enum":[True],
-                     "description":"True only when user explicitly requests this template for this completed draft"}
+                     "description":"True only when user explicitly requests this template for this completed draft"},
+        "layout_overrides":{"type":"array","maxItems":20,"items":{
+            "$ref":"#/definitions/LayoutOverride"},
+            "description":"Optional AI-selected exact layout name for each 1-based output slide"}
+    }}
+    analyze_request = {"type":"object","required":["slide_ids"],"properties":{
+        "slide_ids":{"type":"array","minItems":1,"maxItems":20,"uniqueItems":True,
+                     "items":{"type":"string","minLength":1,"maxLength":128}}
+    }}
+    layout_override = {"type":"object","required":["output_slide","layout_name"],"properties":{
+        "output_slide":{"type":"integer","minimum":1,"maximum":20},
+        "layout_name":{"type":"string","minLength":1,"maxLength":255}
     }}
     body=lambda schema:[{"name":"body","in":"body","required":True,"schema":schema}]
     path=lambda name:[{"name":name,"in":"path","required":True,"type":"string"}]
     return {
-      "swagger":"2.0","info":{"title":"Presentation Assistant","version":"1.2.0",
-      "description":"Search source slides, plan and revise storylines, confirm drafts and apply templates."},
+      "swagger":"2.0","info":{"title":"Presentation Assistant","version":"1.3.0",
+      "description":"Search and structurally analyze source slides, plan and revise storylines, confirm drafts, apply exact template layouts and review layout risks."},
       "host":url.netloc,"basePath":url.path.rstrip("/") or "/","schemes":["https"],
       "consumes":["application/json"],"produces":["application/json"],
       "securityDefinitions":security,"security":requirement,
       "paths":{
         "/api/search":{"post":operation("SearchSlides","Search approved source slides",body(search_request),
           {"type":"object","properties":{"query":{"type":"string"},"results":{"type":"array","items":{"$ref":"#/definitions/Slide"}}}})},
+        "/api/slides/analyze":{"post":operation("AnalyzeSlides","Inspect selected slide structure before layout decisions",body(analyze_request),
+          {"type":"object","properties":{"slides":{"type":"array","items":{"$ref":"#/definitions/SlideAnalysis"}},"limitations":{"type":"array","items":{"type":"string"}}}})},
         "/api/slides/{slide_id}/versions":{"get":operation("GetSlideVersions","Inspect related source versions",path("slide_id"),
           {"type":"object","properties":{"slideId":{"type":"string"},"versions":{"type":"array","items":{"$ref":"#/definitions/Slide"}}}})},
         "/api/templates":{"post":operation("UploadTemplate","Upload a chat attachment as a PowerPoint template",body(upload_request),{"$ref":"#/definitions/Template"},"201")},
@@ -154,11 +202,14 @@ def specification(base_url: str, auth: str, tenant_id: str, api_app_id: str) -> 
         "/api/plans/{plan_id}/draft":{
           "post":operation("CreateDraftFromPlan","Create a PPT after confirming an exact storyline revision",path("plan_id")+body(finalize_request),{"$ref":"#/definitions/Job"},"202")},
         "/api/drafts":{"post":operation("CreateDraft","Create a draft after user confirmation",body(draft_request),{"$ref":"#/definitions/Job"},"202")},
-        "/api/drafts/{job_id}":{"get":operation("GetDraftStatus","Check draft status and file link",path("job_id"),{"$ref":"#/definitions/Job"})}
+        "/api/drafts/{job_id}":{"get":operation("GetDraftStatus","Check draft status and file link",path("job_id"),{"$ref":"#/definitions/Job"})},
+        "/api/drafts/{job_id}/layout-report":{"get":operation("GetLayoutReport","Review heuristic layout risks in a completed draft",path("job_id"),{"$ref":"#/definitions/LayoutReport"})}
       },
       "definitions":{"Slide":slide,"SourceMapEntry":provenance,"Job":job,"Template":template,
                      "ProposedSection":plan_proposed_section,"RevisionSection":revision_section,
-                     "PlanSection":plan_section,"Plan":plan_result}
+                     "PlanSection":plan_section,"Plan":plan_result,
+                     "SlideAnalysis":slide_analysis,"LayoutIssue":layout_issue,
+                     "LayoutReport":layout_report,"LayoutOverride":layout_override}
     }
 
 def main():

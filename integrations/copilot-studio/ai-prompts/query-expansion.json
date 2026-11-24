@@ -1,0 +1,174 @@
+{
+  "type": "copilot-studio-prompt-blueprint",
+  "importable": false,
+  "version": "1.0",
+  "name": "Multilingual lexical query expansion",
+  "purpose": "Create a small set of complementary lexical searches for one approved storyline section without changing its meaning.",
+  "manualConfiguration": "Create a Prompt action manually, map the named inputs, and enforce the JSON output schema. Send every returned query to SearchSlides separately, then de-duplicate candidates by exact slideId.",
+  "inputs": [
+    {
+      "name": "section_id",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "section_title",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "section_goal",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "user_request",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "reporting_period",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "source_languages",
+      "type": "string",
+      "required": false,
+      "description": "Likely languages in the indexed slide library, for example English, French and Spanish."
+    }
+  ],
+  "instructions": [
+    "Create 2 to 5 short, complementary queries for the current lexical slide index. Search recall is the goal; candidate relevance is judged later.",
+    "Always include one concise English canonical query. Add a translated or source-language variant only when it is useful for the stated geography or likely corpus language.",
+    "Preserve named entities, technical acronyms and requested scope. Do not silently replace Zambia with another country or animal AMR with human-only AMR.",
+    "Use distinct variants: exact geography and concept, likely synonym, programme or policy vocabulary, and translated wording where justified. Do not return superficial word-order permutations.",
+    "Do not add unsupported organisations, programme names, policy titles, years, statistics or slide IDs.",
+    "Keep each query within 400 characters. Put optional exclusions in excluded_terms; do not use unsupported search syntax.",
+    "Return only JSON that validates against outputSchema."
+  ],
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "section_id",
+      "canonical_query_en",
+      "queries"
+    ],
+    "properties": {
+      "section_id": {
+        "type": "string",
+        "pattern": "^S[1-8]$"
+      },
+      "canonical_query_en": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 400
+      },
+      "queries": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 5,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "query_id",
+            "language",
+            "query",
+            "focus",
+            "required_terms",
+            "excluded_terms"
+          ],
+          "properties": {
+            "query_id": {
+              "type": "string",
+              "pattern": "^Q[1-5]$"
+            },
+            "language": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 30
+            },
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            },
+            "focus": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required_terms": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "excluded_terms": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "example": {
+    "inputs": {
+      "section_id": "S1",
+      "section_title": "Reaching farmers and traditional leaders",
+      "section_goal": "Find source slides documenting sensitization, awareness and prudent-use training for livestock stakeholders in Zambia.",
+      "user_request": "How did Zambia reach farmers and traditional leaders about prudent antibiotic use?",
+      "reporting_period": "",
+      "source_languages": "English"
+    },
+    "output": {
+      "section_id": "S1",
+      "canonical_query_en": "Zambia farmers traditional leaders prudent antibiotic use awareness veterinary",
+      "queries": [
+        {
+          "query_id": "Q1",
+          "language": "English",
+          "query": "Zambia farmers traditional leaders prudent antibiotic use awareness veterinary",
+          "focus": "Exact country, stakeholder groups and stewardship behaviour",
+          "required_terms": [
+            "Zambia",
+            "farmers"
+          ],
+          "excluded_terms": []
+        },
+        {
+          "query_id": "Q2",
+          "language": "English",
+          "query": "Zambia livestock sensitization antimicrobial resistance stewardship training",
+          "focus": "Likely programme vocabulary for outreach and training",
+          "required_terms": [
+            "Zambia"
+          ],
+          "excluded_terms": []
+        },
+        {
+          "query_id": "Q3",
+          "language": "English",
+          "query": "Zambia veterinary awareness campaign farmers community leaders antibiotics",
+          "focus": "Community engagement synonyms",
+          "required_terms": [
+            "Zambia"
+          ],
+          "excluded_terms": []
+        }
+      ]
+    }
+  }
+}

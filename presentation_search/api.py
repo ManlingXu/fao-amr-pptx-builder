@@ -25,6 +25,8 @@ from .plans import PlanStore, PlanConflict
 from .providers.local import LocalKnowledgeProvider
 from .providers.sharepoint import SharePointKnowledgeProvider
 from .search import SearchIndex
+from .slide_analysis import analyze_slides
+from .layout_validation import validate_layout
 from .templates import MAX_TEMPLATE_BASE64, TemplateStore
 
 TemplateId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$", min_length=32, max_length=32)]
@@ -37,11 +39,32 @@ class TemplateUploadRequest(BaseModel):
     content_base64: Annotated[str, StringConstraints(min_length=1, max_length=MAX_TEMPLATE_BASE64)]
 
 
+class AnalyzeSlidesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    slide_ids: list[Annotated[str, StringConstraints(min_length=1, max_length=128)]] = Field(
+        min_length=1, max_length=20
+    )
+
+    @field_validator("slide_ids")
+    @classmethod
+    def validate_ids(cls, ids):
+        if len(ids) != len(set(ids)):
+            raise ValueError("Slide IDs must be unique")
+        return ids
+
+
+class SlideLayoutOverride(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    output_slide: int = Field(ge=1, le=20)
+    layout_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+
+
 class ApplyTemplateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     template_id: TemplateId
     title: Title | None = None
     confirmed: StrictBool
+    layout_overrides: list[SlideLayoutOverride] = Field(default_factory=list, max_length=20)
 
     @field_validator("confirmed")
     @classmethod
@@ -49,6 +72,14 @@ class ApplyTemplateRequest(BaseModel):
         if not value:
             raise ValueError("Explicit confirmation is required")
         return value
+
+    @field_validator("layout_overrides")
+    @classmethod
+    def validate_layout_overrides(cls, overrides):
+        slides = [item.output_slide for item in overrides]
+        if len(slides) != len(set(slides)):
+            raise ValueError("A slide can have only one template layout override")
+        return overrides
 
 
 
@@ -184,7 +215,7 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
         finally:
             jobs.stop()
 
-    app = FastAPI(title="Teams Presentation Assistant", version="1.2.0", lifespan=lifespan)
+    app = FastAPI(title="Teams Presentation Assistant", version="1.3.0", lifespan=lifespan)
     app.state.index = active_index
     app.state.provider = provider
     app.state.settings = settings
@@ -203,6 +234,57 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
     def search(request: SearchRequest):
         results = active_index.search(request.query, request.limit, request.latest_only)
         return {"query": request.query, "results": [_serialize_result(result) for result in results]}
+
+    @app.post("/api/slides/analyze", dependencies=[auth])
+    def analyze_selected_slides(request: AnalyzeSlidesRequest):
+        try:
+            slides = active_index.lookup(request.slide_ids)
+        except KeyError:
+            raise HTTPException(
+                409, "A selected slide is no longer indexed. Search and select it again."
+            ) from None
+        try:
+            with TemporaryDirectory() as directory:
+                paths = provider.snapshot(slides, Path(directory))
+                by_source: dict[str, list] = {}
+                for slide in slides:
+                    by_source.setdefault(slide.source_key, []).append(slide)
+                analyzed = {}
+                for source_key, source_slides in by_source.items():
+                    results = analyze_slides(
+                        paths[source_key], [slide.slide_number for slide in source_slides]
+                    )
+                    analyzed.update(zip((slide.id for slide in source_slides), results))
+        except (ValueError, FileNotFoundError):
+            raise HTTPException(
+                409, "A selected source changed or is unavailable. Refresh the index and search again."
+            ) from None
+
+        response = []
+        for slide in slides:
+            analysis = analyzed[slide.id]
+            counts = analysis["shape_counts"]
+            response.append(
+                {
+                    **provenance(slide),
+                    "wordCount": analysis["word_count"],
+                    "occupancyRatio": analysis["occupancy_ratio"],
+                    "textShapeCount": counts["text_boxes"],
+                    "pictureCount": counts["pictures"],
+                    "tableCount": counts["tables"],
+                    "chartCount": counts["charts"],
+                    "groupCount": counts["groups"],
+                    "contentType": analysis["content_type"],
+                    "density": analysis["density"],
+                    "recommendedLayoutAction": analysis["recommended_layout_action"],
+                }
+            )
+        return {
+            "slides": response,
+            "limitations": [
+                "This is structural PowerPoint analysis; it does not interpret picture meaning."
+            ],
+        }
 
     @app.get("/api/slides/{slide_id}/versions", dependencies=[auth])
     def versions(slide_id: str):
@@ -320,8 +402,32 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
         if source["status"] != "completed":
             raise HTTPException(409, "The source draft is not ready for a template change.")
         template = owned_template(request.template_id, owner)
+        layout_names = template[0]["layoutNames"]
+        slide_count = len(source["sourceMap"])
+        layout_overrides = {}
+        for override in request.layout_overrides:
+            if override.output_slide > slide_count:
+                raise HTTPException(
+                    422, f"Output slide {override.output_slide} does not exist in this draft."
+                )
+            occurrences = layout_names.count(override.layout_name)
+            if occurrences == 0:
+                raise HTTPException(
+                    422, f"Template layout '{override.layout_name}' does not exist in this template."
+                )
+            if occurrences > 1:
+                raise HTTPException(
+                    422, f"Template layout '{override.layout_name}' is ambiguous in this template."
+                )
+            layout_overrides[override.output_slide] = override.layout_name
         try:
-            return jobs.submit_template(owner, source, request.title or source["title"], template)
+            return jobs.submit_template(
+                owner,
+                source,
+                request.title or source["title"],
+                template,
+                layout_overrides=layout_overrides,
+            )
         except OverflowError:
             raise HTTPException(429, "Draft queue is busy. Try again shortly.") from None
 
@@ -334,6 +440,16 @@ def create_app(index: SearchIndex | None = None, settings: Settings | None = Non
     @app.get("/api/drafts/{job_id}")
     def get_draft(job=Depends(owned_job)):
         return job
+
+    @app.get("/api/drafts/{job_id}/layout-report")
+    def get_layout_report(job=Depends(owned_job)):
+        if job["status"] != "completed":
+            raise HTTPException(409, "The draft is not ready for layout review")
+        try:
+            report = validate_layout(settings.drafts_path / job["jobId"] / "draft.pptx")
+        except (OSError, ValueError, KeyError):
+            raise HTTPException(409, "The completed draft could not be inspected") from None
+        return {"jobId": job["jobId"], "slideCount": report["summary"]["slides"], **report}
 
     @app.get("/api/drafts/{job_id}/file")
     def download(job=Depends(owned_job)):

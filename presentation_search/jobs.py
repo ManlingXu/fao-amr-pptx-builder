@@ -73,12 +73,19 @@ class DraftJobs:
     def submit(self, owner: str, title: str, slides: list[SlideDocument], template=None) -> dict:
         return self._submit(owner, title, slides, template)
 
-    def submit_template(self, owner: str, source_job: dict, title: str, template) -> dict:
+    def submit_template(
+        self,
+        owner: str,
+        source_job: dict,
+        title: str,
+        template,
+        layout_overrides: dict[int, str] | None = None,
+    ) -> dict:
         if source_job["status"] != "completed":
             raise ValueError("The source draft is not ready for a template change.")
-        return self._submit(owner, title, [], template, source_job)
+        return self._submit(owner, title, [], template, source_job, layout_overrides)
 
-    def _submit(self, owner, title, slides, template, source_job=None):
+    def _submit(self, owner, title, slides, template, source_job=None, layout_overrides=None):
         if self.pool is None or not self.slots.acquire(blocking=False):
             raise OverflowError("Draft queue is busy. Try again shortly.")
         try:
@@ -98,6 +105,11 @@ class DraftJobs:
                 "error": None,
                 "template": template[0] if template else None,
                 "sourceJobId": source_job["jobId"] if source_job else None,
+                "layoutOverrides": [
+                    {"outputSlide": slide, "layoutName": name}
+                    for slide, name in sorted((layout_overrides or {}).items())
+                ],
+                "appliedLayouts": None,
             }
             if template:
                 shutil.copyfile(template[1], folder / "template.upload")
@@ -118,6 +130,7 @@ class DraftJobs:
         try:
             record["status"] = "running"
             self._write(record)
+            applied_layouts = None
             with TemporaryDirectory(dir=folder) as scratch:
                 work = Path(scratch)
                 output = work / "assembled.pptx"
@@ -136,7 +149,14 @@ class DraftJobs:
                     template_path = work / ("uploaded-template" + Path(record["template"]["fileName"]).suffix.lower())
                     shutil.copyfile(folder / "template.upload", template_path)
                     styled = work / "templated.pptx"
-                    template_report = apply_template(output, template_path, styled)
+                    overrides = {
+                        item["outputSlide"]: item["layoutName"]
+                        for item in record.get("layoutOverrides", [])
+                    }
+                    template_report = apply_template(
+                        output, template_path, styled, layout_overrides=overrides
+                    )
+                    applied_layouts = template_report["template"]["appliedLayouts"]
                     report["warnings"] = list(dict.fromkeys(
                         report.get("warnings", []) + record["template"].get("warnings", [])
                         + template_report.get("warnings", [])
@@ -152,6 +172,7 @@ class DraftJobs:
                 webUrl=url,
                 downloadUrl=f"/api/drafts/{job_id}/file",
                 warnings=report.get("warnings", []),
+                appliedLayouts=applied_layouts,
                 sourceMap=(record["sourceMap"] if record.get("sourceJobId") else
                            [{"outputSlide": n, **provenance(s)} for n, s in enumerate(slides, 1)]),
             )
