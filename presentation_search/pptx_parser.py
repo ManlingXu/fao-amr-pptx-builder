@@ -8,7 +8,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from pptx import Presentation
-from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.shapes.group import GroupShape
 
 from .freshness import extract_date_signals, normalize_family_key
 from .models import DeckDocument, SlideDocument
@@ -27,7 +27,7 @@ def _shape_text(shape) -> list[str]:
                 value = cell.text.strip()
                 if value:
                     values.append(value)
-    if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+    if isinstance(shape, GroupShape):
         for child in shape.shapes:
             values.extend(_shape_text(child))
     return values

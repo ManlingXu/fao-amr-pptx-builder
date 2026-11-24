@@ -10,3 +10,4 @@ data/sharepoint-cache
 examples/output
 build
 dist
+.local
