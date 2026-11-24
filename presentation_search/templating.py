@@ -207,6 +207,27 @@ def _select_layout(layouts, source_type, has_title):
     return layouts[0]
 
 
+def _layout_name(layout):
+    node = layout[1]
+    return node.find(P + "cSld").get("name", node.get("type", "Layout"))
+
+
+def _resolve_layout_overrides(layouts, slide_count, overrides):
+    if not overrides:
+        return {}
+    resolved = {}
+    for slide_number, layout_name in overrides.items():
+        if not isinstance(slide_number, int) or not 1 <= slide_number <= slide_count:
+            raise ValueError(f"Template layout override has invalid slide number {slide_number}.")
+        matches = [layout for layout in layouts if _layout_name(layout) == layout_name]
+        if not matches:
+            raise ValueError(f"Template layout '{layout_name}' was not found.")
+        if len(matches) > 1:
+            raise ValueError(f"Template layout '{layout_name}' is ambiguous.")
+        resolved[slide_number] = matches[0]
+    return resolved
+
+
 def _content_area(layout, master, width, height, has_title):
     candidates = []
     for shape in _tree(layout):
@@ -289,7 +310,7 @@ def _restyle_slide(slide, source_layout, source_master, target_layout, target_ma
     slide.set("showMasterSp", "1")
 
 
-def _merged_package(source, template, layouts):
+def _merged_package(source, template, layouts, layout_overrides=None):
     """Build a virtual OPC source; only selected dependencies reach final output."""
     blobs = {name: source.zip.read(name) for name in source.names}
     types = _parse(blobs["[Content_Types].xml"])
@@ -351,7 +372,7 @@ def _merged_package(source, template, layouts):
             dest_fonts.append(copied)
     width, height = _dims(target_size)
     used = []
-    for part in source.slides:
+    for slide_number, part in enumerate(source.slides, 1):
         rels = source.rels(part)
         layout_links = [(rid, target) for rid, (kind, target, ext) in rels.items()
                         if kind == R + "/slideLayout" and not ext]
@@ -366,7 +387,10 @@ def _merged_package(source, template, layouts):
         old_master = _parse(source.zip.read(masters[0]))
         node = _parse(blobs[part])
         has_title = any(_role(s) in {"title", "ctrTitle"} for s in _tree(node))
-        target, target_node, _, master_node = _select_layout(layouts, old_layout_node.get("type"), has_title)
+        target, target_node, _, master_node = (layout_overrides or {}).get(
+            slide_number,
+            _select_layout(layouts, old_layout_node.get("type"), has_title),
+        )
         _restyle_slide(node, old_layout_node, old_master, target_node, master_node, width, height)
         new_rels = _relations()
         for rid, (kind, rel_target, external) in rels.items():
@@ -375,7 +399,7 @@ def _merged_package(source, template, layouts):
                  external)
         blobs[part] = _xml(node)
         blobs[_rels_name(part)] = _xml(new_rels)
-        used.append(target_node.find(P + "cSld").get("name", target_node.get("type", "Layout")))
+        used.append(_layout_name((target, target_node, None, master_node)))
     blobs[PRES] = _xml(root)
     blobs[_rels_name(PRES)] = _xml(pres_rels)
     blobs["[Content_Types].xml"] = _xml(types)
@@ -387,7 +411,12 @@ def _merged_package(source, template, layouts):
     return result, used
 
 
-def apply_template(source: Path, template: Path, output: Path) -> dict:
+def apply_template(
+    source: Path,
+    template: Path,
+    output: Path,
+    layout_overrides: dict[int, str] | None = None,
+) -> dict:
     """Apply a validated PPTX/POTX template, publishing a new PPTX atomically."""
     tmp = None
     try:
@@ -401,7 +430,8 @@ def apply_template(source: Path, template: Path, output: Path) -> dict:
                 raise ValueError("Select at least one slide for template replacement.")
             design = _open_template(stack, template)
             layouts = _layouts(design)
-            merged_data, used = _merged_package(original, design, layouts)
+            overrides = _resolve_layout_overrides(layouts, len(original.slides), layout_overrides)
+            merged_data, used = _merged_package(original, design, layouts, overrides)
             archive = stack.enter_context(ZipFile(merged_data))
             merged = _Source(archive)
             picks = [(merged, merged.select(i)) for i in range(1, len(merged.slides) + 1)]

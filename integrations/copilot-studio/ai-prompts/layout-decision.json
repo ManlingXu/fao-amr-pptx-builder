@@ -1,0 +1,170 @@
+{
+  "type": "copilot-studio-prompt-blueprint",
+  "importable": false,
+  "version": "1.0",
+  "name": "Per-slide template layout decision",
+  "purpose": "Use structural slide analysis and the uploaded template's actual layout names to propose a constrained layout choice and review classification for each selected page.",
+  "manualConfiguration": "Create this Prompt action manually after AnalyzeSlides. Pass the exact UploadTemplate layoutNames and structural analyses. Deterministically map only output_order and layout_name to the backend override fields; keep action and rationale as review guidance.",
+  "inputs": [
+    {
+      "name": "presentation_goal",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "template_layout_names_json",
+      "type": "string",
+      "required": true,
+      "description": "JSON array copied from UploadTemplate.layoutNames."
+    },
+    {
+      "name": "slide_analyses_json",
+      "type": "string",
+      "required": true,
+      "description": "JSON copied from AnalyzeSlides for the exact selected slide IDs in output order."
+    },
+    {
+      "name": "selection_reasons_json",
+      "type": "string",
+      "required": true,
+      "description": "The validated reranking decisions, including the exact slide_id and why it belongs in the story."
+    }
+  ],
+  "instructions": [
+    "Make a design decision from structure, not from imagined pixels. AnalyzeSlides reports heuristics; it is not visual proof that a page is attractive or that text fits.",
+    "Every output slide_id must exactly match one input analysis slideId, and output_order must copy that analysis outputSlide. Every layout_name must exactly match one value in template_layout_names_json. Never invent a layout name.",
+    "Use reuse when the source composition should remain intact, reflow only to recommend later human semantic reflow, and review when high density, complex groups, unsupported content or uncertain fit makes automatic conversion risky. The backend does not execute semantic reflow.",
+    "Prefer title or section layouts for title-like pages, image-led layouts for picture-dominant pages, chart or content layouts for chart pages, and table or content layouts for tables only when those exact layout names exist.",
+    "Do not delete images, charts, tables, citations, notes or provenance. Do not rewrite scientific content in this prompt.",
+    "If no compatible template layout exists, choose the safest existing layout, set action to review, and state the mismatch.",
+    "Python performs only deterministic template-layout assignment and proportional scaling. It does not understand or rewrite the page semantically. Final layout quality is checked by GetLayoutReport and human inspection.",
+    "Return only JSON matching outputSchema."
+  ],
+  "outputValidation": [
+    "Reject output when slide_id is not present as slideId in slide_analyses_json or output_order does not equal that analysis outputSlide.",
+    "Reject output when layout_name is not present in template_layout_names_json.",
+    "Reject output when output_order is duplicated or does not cover the selected slides exactly once.",
+    "For ApplyTemplate, map decisions[].output_order to layout_overrides[].output_slide and decisions[].layout_name to layout_overrides[].layout_name. Discard action, rationale, preserve_elements and review_reasons from the API input.",
+    "Do not send unvalidated model output to a file-writing tool."
+  ],
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "decisions",
+      "requires_manual_review"
+    ],
+    "properties": {
+      "decisions": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 20,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "output_order",
+            "slide_id",
+            "layout_name",
+            "action",
+            "rationale",
+            "preserve_elements",
+            "review_reasons"
+          ],
+          "properties": {
+            "output_order": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "slide_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "layout_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "reuse",
+                "reflow",
+                "review"
+              ]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            },
+            "preserve_elements": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "title",
+                  "body_text",
+                  "pictures",
+                  "charts",
+                  "tables",
+                  "notes",
+                  "citations",
+                  "provenance"
+                ]
+              }
+            },
+            "review_reasons": {
+              "type": "array",
+              "maxItems": 6,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          }
+        }
+      },
+      "requires_manual_review": {
+        "type": "boolean"
+      }
+    }
+  },
+  "example": {
+    "inputs": {
+      "presentation_goal": "Explain Zambia veterinary stewardship to FAO animal health colleagues using a clean organizational template.",
+      "template_layout_names_json": "[\"Title Slide\",\"Title and Content\",\"Picture with Caption\"]",
+      "slide_analyses_json": "[{\"slideId\":\"example-zambia-10\",\"outputSlide\":1,\"contentType\":\"mixed\",\"density\":\"high\",\"wordCount\":96,\"pictureCount\":1,\"tableCount\":0,\"chartCount\":0,\"recommendedLayoutAction\":\"review\"}]",
+      "selection_reasons_json": "[{\"slide_id\":\"example-zambia-10\",\"selection_reason\":\"Directly mentions traditional leaders and farmers.\"}]"
+    },
+    "output": {
+      "decisions": [
+        {
+          "output_order": 1,
+          "slide_id": "example-zambia-10",
+          "layout_name": "Title and Content",
+          "action": "review",
+          "rationale": "The page has mixed content and high text density; the available content layout is the closest match, but automatic fit is uncertain.",
+          "preserve_elements": [
+            "title",
+            "body_text",
+            "pictures",
+            "notes",
+            "citations",
+            "provenance"
+          ],
+          "review_reasons": [
+            "High text density may require manual shortening or splitting after source verification."
+          ]
+        }
+      ],
+      "requires_manual_review": true
+    }
+  }
+}

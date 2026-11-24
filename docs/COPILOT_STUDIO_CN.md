@@ -30,7 +30,7 @@ CSI 配置连接器 OAuth 客户端，并注册连接器返回的 redirect URI�
 
 如另行批准 API-key 受控试用，可用 `--auth api-key` 导出，并集中配置 `X-API-Key` 连接。持有同一密钥的人共享一个身份；生产使用 Entra。
 
-## 4. 添加六个用户操作
+## 4. 添加连接器操作
 
 | 工具 | 输入和用途 |
 |---|---|
@@ -38,8 +38,10 @@ CSI 配置连接器 OAuth 客户端，并注册连接器返回的 redirect URI�
 | `GetSlideVersions` | `slide_id`；核对日期或版本冲突 |
 | `UploadTemplate` | `file_name`、原始二进制的 `content_base64`；经 File-input 主题／flow 传递 |
 | `CreateDraft` | 必填 `title`、1–20 个不重复且有序的 `slide_ids`、`confirmed=true`；可选 `template_id` |
-| `ApplyTemplate` | 已完成且属于当前用户的 `job_id`、`template_id`、`confirmed=true`、可选 `title` |
+| `ApplyTemplate` | 已完成且属于当前用户的 `job_id`、`template_id`、`confirmed=true`，可选 `title` 及校验后的 `layout_overrides`（`output_slide`、准确 `layout_name`） |
 | `GetDraftStatus` | `job_id`；返回状态、提示、来源表与完成链接 |
+| `AnalyzeSlides` | 准确的已选 `slide_ids`；返回对象数量、页面类型、密度及谨慎的排版动作建议 |
+| `GetLayoutReport` | 已完成且属于当前用户的 `job_id`；返回越界、重叠和高密度等启发式风险 |
 
 为 `CreateDraft` 关闭 **Allow agent to decide dynamically when to use the tool**，开启 **Ask the end user before running**。输入绑定到已确认的主题变量，不让 AI 填写确认字段。对应设置见 [微软工具控制](https://learn.microsoft.com/en-us/microsoft-copilot-studio/add-tools-custom-agent)。
 
@@ -70,6 +72,21 @@ Publish 后添加 Teams 渠道，先安装到一对一会话试用。先分享 A
 
 ## V2：故事线规划和多轮修改
 
-在已有的六个工具之外，新增 `PlanPresentation`、`GetPresentationPlan`、`RevisePresentationPlan`、`CreateDraftFromPlan` 四个工具。用户提出演示需求时，Copilot Studio 先按受众和用途拟定章节（标题、检索词、预计页数），调用 `PlanPresentation` 将实际匹配到的幻灯片及来源记录为方案。用户要求增减章节、改变重点或顺序时，先读取当前版本，再用完整选页清单及 `expected_revision` 修订。只允许使用搜索接口返回的真实幻灯片 ID。若资料不足，展示 `gap`，不得编造缺失页面。
+在核心操作之外，另有 `PlanPresentation`、`GetPresentationPlan`、`RevisePresentationPlan`、`CreateDraftFromPlan` 四个规划工具。用户提出演示需求时，Copilot Studio 先按受众和用途拟定章节（标题、检索词、预计页数），调用 `PlanPresentation` 将实际匹配到的幻灯片及来源记录为方案。用户要求增减章节、改变重点或顺序时，先读取当前版本，再用完整选页清单及 `expected_revision` 修订。只允许使用搜索接口返回的真实幻灯片 ID。若资料不足，展示 `gap`，不得编造缺失页面。
 
 **生成前须再次明确确认最新的 planId、revision、选页顺序及模板。** 把 `CreateDraftFromPlan` 的动态调用关闭，开启 Ask the end user before running；不要让 AI 自行填写 `confirmed=true`。提交后查询 `GetDraftStatus`，成功后显示返回的 SharePoint webUrl。新增的 `integrations/copilot-studio/flow-design.json` V2 节点是配置蓝图，不能直接导入为 Agent。完整流程、示例和限制见 [V2 中文指南](V2_WORKFLOW_CN.md)。
+
+## V3：配置 AI 决策提示词
+
+[`integrations/copilot-studio/ai-prompts`](../integrations/copilot-studio/ai-prompts/) 下的文件是结构化输出的**配置蓝图**，不是可直接导入的 Prompt。在批准环境中手工创建四个 Prompt action，并按文件配置输入、指令和 JSON 输出结构：
+
+1. `presentation-brief.json`：根据受众、用途和页数拟故事线，不产生资料事实或 slide ID。
+2. `query-expansion.json`：每章生成 2–5 个互补的关键词检索，保留国家、专业缩写与范围。
+3. `candidate-reranking.json`：只能在 `SearchSlides` 返回的真实候选中重排，保存原文证据、选中理由、风险和资料缺口。
+4. `layout-decision.json`：结合 `AnalyzeSlides` 的结构分析，只能从 `UploadTemplate.layoutNames` 返回的真实版式名中选择。
+
+按 [flow-design.json](../integrations/copilot-studio/flow-design.json) 的 `smartAiWorkflow` 手工配置循环、变量和校验。每个扩展查询分别调用 `SearchSlides`，按准确 `slideId` 去重，校验重排结果，先建立初始 plan，再用经过校验的 AI 选页调用 `RevisePresentationPlan`。这一步不能省略：单独调用 `PlanPresentation` 仍然只是后台的确定性排序，并不代表 AI 已经重排候选页。
+
+Prompt 输出先保存为主题变量，校验后才能绑定工具。出现未知／重复 slide ID、证据文字不在对应候选标题或摘要、虚构版式名、选页超过本章页数时，一律拒绝。Prompt 不能填写 `confirmed=true`。在用户确认准确的 plan 版本前，必须展示选中理由和资料缺口。
+
+模板决策前调用 `AnalyzeSlides`，最终任务 completed 后调用 `GetLayoutReport`。将 `decisions[].output_order` 映射为 `layout_overrides[].output_slide`，将 `decisions[].layout_name` 映射为 `layout_overrides[].layout_name`，不能把理由等说明字段传给接口。后台只分配准确的模板版式并按比例缩放原页几何，不执行语义重排，因此 `action: reflow` 只是人工复核建议。两项检查都是结构启发式，不是视觉理解：图片数量不能证明图片相关，检查无警告也不能证明排版完美。最终仍须用桌面 PowerPoint 人工检查。

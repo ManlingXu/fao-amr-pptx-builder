@@ -1,0 +1,194 @@
+{
+  "type": "copilot-studio-prompt-blueprint",
+  "importable": false,
+  "version": "1.0",
+  "name": "AMR presentation brief and storyline planner",
+  "purpose": "Turn the user's request into a presentation brief and an audience-specific story arc before any slide IDs are selected.",
+  "manualConfiguration": "Create a Prompt action in the approved Copilot Studio environment, paste the instructions, create the named inputs, choose JSON output, and reproduce the output schema. This file is not an importable prompt or solution.",
+  "inputs": [
+    {
+      "name": "user_request",
+      "type": "string",
+      "required": true,
+      "description": "The user's request in their own language."
+    },
+    {
+      "name": "audience",
+      "type": "string",
+      "required": true,
+      "description": "Who will see the presentation."
+    },
+    {
+      "name": "purpose",
+      "type": "string",
+      "required": true,
+      "description": "The decision, discussion or learning outcome the presentation should support."
+    },
+    {
+      "name": "target_slide_count",
+      "type": "integer",
+      "required": true,
+      "description": "Requested total number of source slides."
+    },
+    {
+      "name": "reporting_period",
+      "type": "string",
+      "required": false,
+      "description": "User-specified date range, or an empty string when none was supplied."
+    },
+    {
+      "name": "constraints",
+      "type": "string",
+      "required": false,
+      "description": "Countries, sectors, excluded topics, required sources, tone and other constraints."
+    },
+    {
+      "name": "response_language",
+      "type": "string",
+      "required": true,
+      "description": "Language for section titles, rationale and clarification questions."
+    }
+  ],
+  "instructions": [
+    "Act as a presentation editor, not as a scientific source. Organize the user's stated need into a coherent story arc; do not add unsupported AMR facts.",
+    "Return between 2 and 8 sections. Allocate a positive slide count to each section and make the sum equal target_slide_count.",
+    "Give each section one distinct communication job. Avoid several sections that repeat the same background material.",
+    "Use stable section_id values S1, S2 and so on in output order.",
+    "Do not output, infer or fabricate slide IDs, source decks, dates, URLs, statistics or claims. Source selection happens only after SearchSlides.",
+    "If a missing user choice would materially change the structure, list a short clarification question and still provide the least-assumptive provisional brief.",
+    "Use response_language for human-facing text. Keep specialist acronyms and proper nouns such as AMR, Zambia and One Health unchanged where appropriate.",
+    "Return only one JSON object that validates against outputSchema. Do not wrap it in Markdown."
+  ],
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "title",
+      "audience",
+      "purpose",
+      "target_slide_count",
+      "story_arc",
+      "sections",
+      "clarification_questions"
+    ],
+    "properties": {
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "audience": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "purpose": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      },
+      "target_slide_count": {
+        "type": "integer",
+        "minimum": 2,
+        "maximum": 40
+      },
+      "reporting_period": {
+        "type": "string",
+        "maxLength": 120
+      },
+      "story_arc": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      },
+      "sections": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 8,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "section_id",
+            "title",
+            "goal",
+            "slide_count",
+            "rationale"
+          ],
+          "properties": {
+            "section_id": {
+              "type": "string",
+              "pattern": "^S[1-8]$"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "goal": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "slide_count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            }
+          }
+        }
+      },
+      "clarification_questions": {
+        "type": "array",
+        "maxItems": 3,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      }
+    }
+  },
+  "example": {
+    "inputs": {
+      "user_request": "Prepare a short presentation on veterinary antimicrobial stewardship in Zambia. Show how farmers and traditional leaders were reached and which policies support animal AMR surveillance.",
+      "audience": "FAO animal health colleagues",
+      "purpose": "Review Zambia evidence and identify material for a technical discussion",
+      "target_slide_count": 4,
+      "reporting_period": "",
+      "constraints": "Focus on animals, poultry and One Health; use existing approved slides only",
+      "response_language": "English"
+    },
+    "output": {
+      "title": "Veterinary antimicrobial stewardship in Zambia",
+      "audience": "FAO animal health colleagues",
+      "purpose": "Review Zambia evidence and identify material for a technical discussion",
+      "target_slide_count": 4,
+      "reporting_period": "",
+      "story_arc": "Move from stakeholder outreach to the policy and surveillance framework, then close with evidence gaps for discussion.",
+      "sections": [
+        {
+          "section_id": "S1",
+          "title": "Reaching farmers and traditional leaders",
+          "goal": "Find source slides that document awareness, sensitization and prudent-use training for livestock stakeholders in Zambia.",
+          "slide_count": 2,
+          "rationale": "Start with implementation and the people reached before discussing the enabling system."
+        },
+        {
+          "section_id": "S2",
+          "title": "Policy and surveillance support",
+          "goal": "Find source slides about Zambian veterinary policy, AMR documents and surveillance in poultry or farmed animals.",
+          "slide_count": 2,
+          "rationale": "Connect field engagement to the documents and surveillance arrangements that support it."
+        }
+      ],
+      "clarification_questions": []
+    }
+  }
+}

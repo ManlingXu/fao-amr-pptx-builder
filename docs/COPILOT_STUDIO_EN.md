@@ -30,7 +30,7 @@ Use **End user** authentication so the backend receives the requester identity. 
 
 For a separately approved controlled API-key pilot, export with `--auth api-key` and configure the `X-API-Key` connection centrally. All key holders share one identity; this is not the production identity route.
 
-## 4. Add the six user operations
+## 4. Add the connector operations
 
 | Tool | Inputs and intended use |
 |---|---|
@@ -38,8 +38,10 @@ For a separately approved controlled API-key pilot, export with `--auth api-key`
 | `GetSlideVersions` | `slide_id` when a date/version conflict needs review |
 | `UploadTemplate` | `file_name`, original binary `content_base64`; use the file-input topic/flow |
 | `CreateDraft` | Required `title`, ordered unique `slide_ids` (1–20), `confirmed=true`; optional `template_id` |
-| `ApplyTemplate` | Completed owned `job_id`, `template_id`, `confirmed=true`, optional `title` |
+| `ApplyTemplate` | Completed owned `job_id`, `template_id`, `confirmed=true`, optional `title` and validated `layout_overrides` (`output_slide`, exact `layout_name`) |
 | `GetDraftStatus` | `job_id`; returns state, warnings, source map and completed link |
+| `AnalyzeSlides` | Exact selected `slide_ids`; returns structural object counts, content type, density and a cautious layout-action hint |
+| `GetLayoutReport` | Completed owned `job_id`; returns heuristic off-canvas, overlap and density warnings for the generated file |
 
 For `CreateDraft`, turn off **Allow agent to decide dynamically when to use the tool** and turn on **Ask the end user before running**. Bind the exact confirmed topic variables; do not allow AI to fill the confirmation field. This uses the [tool controls documented by Microsoft](https://learn.microsoft.com/en-us/microsoft-copilot-studio/add-tools-custom-agent).
 
@@ -70,6 +72,21 @@ Record the live results and operational owners before announcing availability.
 
 ## V2: planning and iterative revision
 
-Four tools extend the original six: `PlanPresentation`, `GetPresentationPlan`, `RevisePresentationPlan` and `CreateDraftFromPlan`. Copilot Studio proposes section names, search queries and page counts for the stated audience and purpose. The backend stores only slide IDs returned from the approved index and shows coverage gaps. For a follow-up such as “less background, more FAO projects,” fetch the latest plan, search for new valid IDs if necessary, and call `RevisePresentationPlan` with the **complete** updated section list and current `expected_revision`. Reject stale revisions; never invent missing slides.
+Four planning tools extend the core operations: `PlanPresentation`, `GetPresentationPlan`, `RevisePresentationPlan` and `CreateDraftFromPlan`. Copilot Studio proposes section names, search queries and page counts for the stated audience and purpose. The backend stores only slide IDs returned from the approved index and shows coverage gaps. For a follow-up such as “less background, more FAO projects,” fetch the latest plan, search for new valid IDs if necessary, and call `RevisePresentationPlan` with the **complete** updated section list and current `expected_revision`. Reject stale revisions; never invent missing slides.
 
 **Before generating, ask the user to explicitly approve the exact planId, revision, slide order and template.** Disable dynamic usage for `CreateDraftFromPlan`, enable “Ask the end user before running,” and bind `confirmed=true` from the approval topic rather than model-generated arguments. Poll `GetDraftStatus` and show only the actual completed SharePoint webUrl. The V2 section of `flow-design.json` is **a blueprint, not an importable agent/topic/flow**. See the complete [V2 workflow guide](V2_WORKFLOW_EN.md).
+
+## V3: configure the AI decision prompts
+
+The files under [`integrations/copilot-studio/ai-prompts`](../integrations/copilot-studio/ai-prompts/) are structured-output **configuration blueprints**, not importable prompts. In the approved environment, manually create four Prompt actions and reproduce each file's named inputs, instructions and JSON output schema:
+
+1. `presentation-brief.json` — audience-specific story arc and section allocation, without source claims or slide IDs.
+2. `query-expansion.json` — two to five complementary lexical searches per section, preserving geography and specialist terms.
+3. `candidate-reranking.json` — selection only from exact `SearchSlides` results, with copied evidence, reasons, risks and coverage gaps.
+4. `layout-decision.json` — choice only among exact `UploadTemplate.layoutNames`, using the structural result from `AnalyzeSlides`.
+
+Implement the `smartAiWorkflow` in [flow-design.json](../integrations/copilot-studio/flow-design.json) manually. Search every query variant, de-duplicate by exact `slideId`, validate the reranker output, create the initial plan, and then call `RevisePresentationPlan` with the validated reranked IDs. That revision is essential: `PlanPresentation` alone still uses deterministic backend ranking.
+
+Keep prompt output in topic variables and validate it before tool binding. Reject an unknown or duplicate slide ID, an evidence snippet not found in the matching candidate, an invented layout name, or a selection that exceeds the section count. A prompt must never populate `confirmed=true`. Show selection reasons and coverage gaps before the user confirms the exact current plan revision.
+
+Call `AnalyzeSlides` before a template decision and `GetLayoutReport` after the final job completes. Map `decisions[].output_order` to `layout_overrides[].output_slide` and `decisions[].layout_name` to `layout_overrides[].layout_name`; do not pass the explanatory fields. The backend assigns the exact layout and proportionally scales source geometry. It does not execute semantic reflow, so `action: reflow` is a human-review recommendation. These tools are structural heuristics, not visual AI: picture counts do not establish image relevance, and a clean layout report does not prove correct rendering. Open the final file in desktop PowerPoint for human review.

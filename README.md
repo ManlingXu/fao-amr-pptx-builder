@@ -1,6 +1,6 @@
 # Teams PowerPoint Assistant
 
-Find approved existing slides, propose an audience-specific presentation storyline, revise ordered sections over several turns, confirm the latest plan revision, and assemble an editable PowerPoint draft for Teams.
+Find approved existing slides, use a constrained Copilot decision layer to plan and rerank them, choose real template layouts, confirm the latest plan revision, and assemble an editable PowerPoint draft for Teams.
 
 **中文：** 从批准的共享 PPTX 中选页，核对来源、版本和数据时间；确认顺序后生成可编辑初稿。也可以在对话中上传 PPT 模板，为新初稿或已完成的初稿更换模板，并返回有访问权限控制的 SharePoint 链接。
 
@@ -9,13 +9,13 @@ Find approved existing slides, propose an audience-specific presentation storyli
 ## One workflow
 
 1. **Understand:** Copilot Studio supplies the conversational LLM and collects the request.
-2. **Search and review:** the backend searches approved PPTX slides and returns the source deck, slide number, reporting date and date evidence. Related versions are available for review.
-3. **Plan and revise (V2):** Copilot Studio proposes sections and per-section queries. The backend saves a revisioned plan with real candidate slide IDs. Follow-up requests can reorder sections and selected slides; coverage gaps remain visible.
-4. **Confirm:** the user approves the exact current plan revision, slides, order and chosen template before creation.
-5. **Assemble:** the backend rechecks source files and copies supported original slides and dependencies into a draft, retaining native editable content and source formatting. Optionally upload a template and apply its master, layout, theme and canvas to the selected slides or to a completed draft.
-6. **Deliver:** Copilot checks the job result and returns its authenticated SharePoint link, warnings and source map.
+2. **Expand, search and rerank:** Copilot can generate complementary lexical queries. The backend returns real source pages; a grounded prompt may rerank only those candidates and must preserve copied evidence and gaps.
+3. **Plan and revise:** the backend saves a revisioned storyline with exact candidate slide IDs. Follow-up requests can reorder sections and selected slides without losing source provenance.
+4. **Analyze and design:** Python reports observable page structure. Copilot may choose only among layout names returned by the uploaded template; Python validates and applies those choices.
+5. **Confirm and assemble:** the user approves the exact current plan revision, slides, order and template treatment. The backend rechecks sources and produces an editable draft.
+6. **Check and deliver:** a heuristic report flags off-canvas objects, substantive overlaps and very dense text. Copilot returns only the completed authenticated link, warnings and source map.
 
-The [V2 plan workflow](docs/V2_WORKFLOW_EN.md) adds four versioned planning tools (Create/Read/Revise/Finalize), with real-user authentication and current-revision checks. The [template upload workflow](docs/TEMPLATE_WORKFLOW_EN.md) includes file-input mapping and two new tools. Backend template processing is implemented; chat attachment support, connector configuration and Teams publication still require tenant validation. Original direct formatting is retained, so applying a template does not automatically redesign every slide.
+The [V2 plan workflow](docs/V2_WORKFLOW_EN.md) adds four versioned planning tools (Create/Read/Revise/Finalize), with real-user authentication and current-revision checks. The [V3 Copilot setup](docs/COPILOT_STUDIO_EN.md#v3-configure-the-ai-decision-prompts) adds four manual prompt blueprints plus `AnalyzeSlides`, validated per-slide layout overrides and `GetLayoutReport`. Backend processing is implemented; the prompts, connector, chat attachment path and Teams publication still require tenant configuration and validation. Original direct formatting is retained, so this remains constrained template application rather than arbitrary generative redesign.
 
 This version has no new factual-slide generation, PDF/DOCX ingestion, separate chat UI, vector search or additional backend LLM. Local demos use scripted or interactive selections. Copilot conversation requires a connected agent.
 
@@ -47,7 +47,7 @@ On Windows, substitute `.venv/Scripts/python.exe` for `.venv/bin/python`. The V1
 
 For the local API, run `start-local.cmd` on Windows or `bash start-local.sh` on macOS/Linux, then open <http://127.0.0.1:8000/docs>.
 
-## Connect the ten tools
+## Connect the twelve tools
 
 | Copilot tool | Purpose |
 |---|---|
@@ -61,10 +61,12 @@ For the local API, run `start-local.cmd` on Windows or `bash start-local.sh` on 
 | `CreateDraft` | Submit explicitly confirmed, ordered slide IDs and an optional template ID |
 | `ApplyTemplate` | Apply an uploaded template to an owned completed draft, creating a new file |
 | `GetDraftStatus` | Retrieve progress and the completed result |
+| `AnalyzeSlides` | Inspect selected pages structurally before making a layout decision |
+| `GetLayoutReport` | Review heuristic layout risks in a completed output |
 
 Production uses Entra user authentication and a separately authorized Graph service identity. The API-key definition is for a local or controlled pilot. `flow-design.json` is a configuration blueprint, not an importable agent or solution. Follow the [Chinese](docs/COPILOT_STUDIO_CN.md) or [English](docs/COPILOT_STUDIO_EN.md) setup guide.
 
-**V2 is backend code plus a Copilot topic blueprint, not an already-published Teams agent.** The LLM plans content only once Copilot Studio has been configured; the local demos use deterministic section queries and support both synthetic fixtures and the opt-in public corpus.
+**V3 is backend code plus Copilot prompt/topic blueprints, not an already-published Teams agent.** The LLM plans, expands queries, reranks and chooses allowed layouts only after the four prompt actions have been configured in Copilot Studio. The local demos remain deterministic and do not call a model.
 
 ## Operating boundary
 
@@ -80,8 +82,8 @@ Live tenant OAuth, Graph grants, hosting, connector import and Teams publication
 
 | Path | Contents |
 |---|---|
-| `presentation_search/` | Search, dates, identity, jobs, original-slide assembly and SharePoint provider |
-| `integrations/copilot-studio/` | Two connector templates, instructions and configuration blueprint |
+| `presentation_search/` | Search, dates, identity, structural analysis, jobs, layout checks, original-slide assembly and SharePoint provider |
+| `integrations/copilot-studio/` | Two connector templates, agent instructions, workflow and four AI prompt blueprints |
 | `scripts/`, `deploy/` | Local run, connector export, packaging and host setup |
 | `data/presentations/`, `examples/output/` | Synthetic sources and demo result |
 | `examples/public_corpus/` | Verified public download catalogue, walkthrough and worked PowerPoint example |

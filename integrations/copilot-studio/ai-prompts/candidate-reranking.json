@@ -1,0 +1,148 @@
+{
+  "type": "copilot-studio-prompt-blueprint",
+  "importable": false,
+  "version": "1.0",
+  "name": "Evidence-grounded slide candidate reranking",
+  "purpose": "Choose the strongest source slides for one section from the exact SearchSlides candidates and record why each page was selected.",
+  "manualConfiguration": "Create this Prompt action manually. Pass the de-duplicated SearchSlides results as candidates_json. Validate the JSON output and reject it if any selected slide_id is absent from the input candidate list.",
+  "inputs": [
+    {
+      "name": "section_id",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "section_goal",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "requested_slide_count",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "user_constraints",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "candidates_json",
+      "type": "string",
+      "required": true,
+      "description": "JSON array copied from SearchSlides after de-duplication. Include slideId, deckName, slideNumber, title, snippet, reportDate, dateReason, url and explanation."
+    }
+  ],
+  "instructions": [
+    "Select only from candidates_json. Every selected slide_id must exactly equal one input slideId; never create, repair, abbreviate or guess an ID.",
+    "Judge direct evidence for section_goal, requested geography, sector, stakeholder and time scope. A keyword mention alone is weaker than a slide whose title or snippet directly addresses the requested evidence.",
+    "Prefer a coherent, non-duplicative set. Do not select several near-identical versions unless a comparison is explicitly requested.",
+    "Treat reportDate, dateReason and freshness as metadata, not as proof that a slide's scientific content is correct. Keep date uncertainty visible.",
+    "evidence_snippet must be copied verbatim from the candidate title or snippet and be no more than 240 characters. If no candidate contains direct evidence, select fewer slides and describe the gap.",
+    "selection_reason must explain the match between the copied evidence and section_goal. It must not introduce a fact absent from the candidate metadata.",
+    "Return at most requested_slide_count selected items, ranked from strongest to weakest. Do not fill the quota with weak or out-of-scope pages.",
+    "Return only JSON matching outputSchema."
+  ],
+  "outputValidation": [
+    "Reject output when selected contains a slide_id not present in candidates_json.",
+    "Reject output when two selected items have the same slide_id.",
+    "Reject output when selected length exceeds requested_slide_count.",
+    "Reject output when evidence_snippet is not a substring of the matching input title or snippet.",
+    "On rejection, do not call RevisePresentationPlan; rerun the prompt with the validation error or request human selection."
+  ],
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "section_id",
+      "selected",
+      "coverage_gap",
+      "requires_user_review"
+    ],
+    "properties": {
+      "section_id": {
+        "type": "string",
+        "pattern": "^S[1-8]$"
+      },
+      "selected": {
+        "type": "array",
+        "maxItems": 8,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rank",
+            "slide_id",
+            "evidence_snippet",
+            "selection_reason",
+            "risks"
+          ],
+          "properties": {
+            "rank": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "slide_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "evidence_snippet": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            },
+            "selection_reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            },
+            "risks": {
+              "type": "array",
+              "maxItems": 4,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          }
+        }
+      },
+      "coverage_gap": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "requires_user_review": {
+        "type": "boolean"
+      }
+    }
+  },
+  "example": {
+    "inputs": {
+      "section_id": "S1",
+      "section_goal": "Find direct evidence of how Zambia reached farmers and traditional leaders about prudent antibiotic use.",
+      "requested_slide_count": 1,
+      "user_constraints": "Animal and veterinary context",
+      "candidates_json": "[{\"slideId\":\"example-zambia-10\",\"deckName\":\"Antimicrobial resistance and antimicrobial stewardship in the animal and veterinary field in Zambia\",\"slideNumber\":10,\"title\":\"Zambias Progress cont.Sensitization and awareness\",\"snippet\":\"traditional, leaders, farmers\",\"reportDate\":null,\"dateReason\":\"date unknown\",\"url\":\"https://example.invalid/zambia.pptx\",\"explanation\":[\"Slide text or notes: traditional, leaders, farmers\"]},{\"slideId\":\"example-india-9\",\"deckName\":\"Comparing approaches to raise awareness in India\",\"slideNumber\":9,\"title\":\"Conclusion\",\"snippet\":\"farmers and veterinarians\",\"reportDate\":null,\"dateReason\":\"date unknown\",\"url\":\"https://example.invalid/india.pptx\",\"explanation\":[\"Slide text: farmers\"]}]"
+    },
+    "output": {
+      "section_id": "S1",
+      "selected": [
+        {
+          "rank": 1,
+          "slide_id": "example-zambia-10",
+          "evidence_snippet": "traditional, leaders, farmers",
+          "selection_reason": "The candidate directly matches the requested country and both stakeholder groups in an animal and veterinary AMR deck.",
+          "risks": [
+            "The source date is unknown and must remain visible."
+          ]
+        }
+      ],
+      "coverage_gap": "The candidate metadata supports the stakeholder groups but does not by itself establish the full outreach method; inspect the original page before final approval.",
+      "requires_user_review": true
+    }
+  }
+}
