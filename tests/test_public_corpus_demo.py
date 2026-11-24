@@ -225,3 +225,20 @@ def test_published_example_traces_every_slide_to_a_pinned_catalogue_entry():
         assert idx == credit["outputSlide"]
         assert credit["sourceHash"] == by_source[credit["sourcePage"]]["sha256"]
         assert credit["title"] == slide.shapes.title.text
+
+
+def test_sector_filter_limits_search_and_carries_archive_provenance(tmp_path):
+    folder = tmp_path / "presentations"
+    folder.mkdir()
+    rows = [
+        dict(write_deck(folder, "farm", ["Antibiotic stewardship"]), sector="animal", training_country="Latvia", zip_member="farm.pptx"),
+        dict(write_deck(folder, "ward", ["Antibiotic stewardship"]), sector="human", training_country="", zip_member=""),
+    ]
+    manifest(tmp_path, rows)
+    result = run_demo(tmp_path, tmp_path / "out", ["stewardship"], sectors=["animal"], confirm=True)
+    assert result["status"] == "completed" and result["indexed_decks"] == 1
+    [source] = get_json(Path(result["output_directory"]) / "source_map.json")
+    assert (source["sector"], source["archiveMember"]) == ("animal", "farm.pptx")
+    assert source["trainingCountry"] == "Latvia"
+    with pytest.raises(ValueError, match="selected sectors"):
+        run_demo(tmp_path, tmp_path / "out", ["stewardship"], sectors=["one-health"])

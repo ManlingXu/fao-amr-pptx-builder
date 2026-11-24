@@ -45,6 +45,7 @@ class SlideDocument:
     report_date: str | None = None
     source_hash: str = ""
     source_key: str = ""
+    deck_title: str = ""
 
 
 @dataclass(slots=True)

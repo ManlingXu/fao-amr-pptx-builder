@@ -19,6 +19,12 @@ The [V2 plan workflow](docs/V2_WORKFLOW_EN.md) adds four versioned planning tool
 
 This version has no new factual-slide generation, PDF/DOCX ingestion, separate chat UI, vector search or additional backend LLM. Local demos use scripted or interactive selections. Copilot conversation requires a connected agent.
 
+## Try the 150-deck AMR collection
+
+Search 3,868 original slides on antimicrobial use, resistance and stewardship. The animal and One Health filters cover 70 presentations. Each entry lists a representative original slide, publisher and pinned download. The local demo supports slide selection, provenance review and editable draft export. A discovery command can rescan the EU farmer and veterinarian training library for new candidates.
+
+[AMR 专题演示与下载步骤](examples/public_corpus/amr/README.md) · [Browse the verified AMR catalogue](examples/public_corpus/amr/catalog.csv)
+
 ## Try the 120-deck public demo
 
 [中文演示与运行步骤 · Public corpus walkthrough](examples/public_corpus/README.md) · [Download the example PowerPoint with credits](examples/public_corpus/Vietnam_AMR_demo.zip) · [Browse the 120 sources](examples/public_corpus/catalog.csv)

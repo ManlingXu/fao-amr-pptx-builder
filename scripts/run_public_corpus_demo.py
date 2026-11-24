@@ -29,7 +29,7 @@ def save_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def load_corpus(root):
+def load_corpus(root, sectors=()):
     """Index only the current verification manifest, even if other decks remain cached."""
     rows = {}
     slides = []
@@ -39,6 +39,8 @@ def load_corpus(root):
         if not {"id", "title", "source_page", "download_url"} <= set(reader.fieldnames or ()):
             raise ValueError("verified.csv is missing required catalogue columns.")
         for row in reader:
+            if sectors and row.get("sector") not in sectors:
+                continue
             deck_id = row["id"]
             if not deck_id or Path(deck_id).name != deck_id or "\\" in deck_id:
                 raise ValueError("Invalid deck ID in verified.csv.")
@@ -60,6 +62,8 @@ def load_corpus(root):
             except Exception as exc:
                 failures.append({"id": deck_id, "reason": str(exc)})
                 continue
+            for slide in deck.slides:
+                slide.deck_title = row["title"]
             slides.extend(deck.slides)
             if len(slides) > 25_000:
                 raise ValueError("Verified corpus exceeds the pilot slide limit.")
@@ -68,7 +72,12 @@ def load_corpus(root):
 
 def public_source(item, rows):
     record = rows[item["deckName"]]
-    attribution = {k: record[k] for k in ("author", "license", "issued") if record.get(k)}
+    attribution = {k: record[k] for k in ("author", "publisher", "license", "issued", "sector", "topic", "language", "series")
+                   if record.get(k)}
+    if record.get("training_country"):
+        attribution["trainingCountry"] = record["training_country"]
+    if record.get("zip_member"):
+        attribution["archiveMember"] = record["zip_member"]
     return {**item, "deckTitle": record["title"], "sourcePage": record["source_page"],
             "downloadUrl": record["download_url"], **attribution}
 
@@ -204,7 +213,7 @@ def review_candidates(searches, sections, presentations, work):
     return finished, rejected
 
 def run_demo(corpus, out, queries, *, slides_per_query=1, reverse_sections=False,
-             confirm=False, title="Public source briefing", template=None, interactive=False):
+             confirm=False, title="Public source briefing", template=None, interactive=False, sectors=()):
     corpus, out = Path(corpus).resolve(), Path(out).resolve()
     presentations = corpus / "presentations"
     if interactive and confirm:
@@ -217,7 +226,9 @@ def run_demo(corpus, out, queries, *, slides_per_query=1, reverse_sections=False
         raise ValueError("Choose 1–8 slides per section and at most 20 slides in total.")
     if not title.strip() or len(title) > 120:
         raise ValueError("Supply a presentation title of up to 120 characters.")
-    rows, index, failures = load_corpus(corpus)
+    rows, index, failures = load_corpus(corpus, sectors)
+    if sectors and not rows:
+        raise ValueError("No verified presentations match the selected sectors.")
     if not index.slides:
         raise ValueError("No verified presentations could be indexed. Run the corpus downloader first.")
     out.mkdir(parents=True, exist_ok=True)
@@ -227,6 +238,8 @@ def run_demo(corpus, out, queries, *, slides_per_query=1, reverse_sections=False
                "indexed_slides": len(index), "index_failures": failures,
                "queries": queries, "requested_slides": len(queries) * slides_per_query,
                "llm_called": False, "microsoft_services_called": False}
+    if sectors:
+        summary["sectors"] = list(sectors)
     with tempfile.TemporaryDirectory(prefix="public-ppt-demo-") as directory:
         work = Path(directory)
         key = secrets.token_urlsafe(32)
@@ -330,6 +343,8 @@ def main():
     parser.add_argument("--corpus-dir", type=Path, default=ROOT / ".local" / "public-corpus")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "build" / "public-corpus-demo")
     parser.add_argument("--query", action="append", help="Search text for a section; repeat for multiple sections.")
+    parser.add_argument("--sector", action="append", choices=("animal", "one-health", "human"),
+                        help="Index only this sector in a labelled catalogue. Repeat to include multiple sectors.")
     parser.add_argument("--title", default="Public source briefing")
     parser.add_argument("--template", type=Path, help="Apply a local .pptx or .potx design to the confirmed draft.")
     parser.add_argument("--slides-per-query", type=int, default=1)
@@ -343,7 +358,7 @@ def main():
                            args.query or ["antimicrobial resistance", "One Health"],
                            title=args.title, slides_per_query=args.slides_per_query,
                            reverse_sections=args.reverse_sections, confirm=args.confirm, template=args.template,
-                           interactive=args.interactive)
+                           interactive=args.interactive, sectors=args.sector or ())
     except (OSError, ValueError) as exc:
         parser.exit(1, f"Public corpus demo: {exc}\n")
     print(json.dumps(summary, indent=2, ensure_ascii=False))
