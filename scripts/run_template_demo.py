@@ -14,6 +14,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from pptx import Presentation
 from pptx.dml.color import RGBColor
+from pptx.enum.shapes import PP_PLACEHOLDER
 from pptx.util import Inches, Pt
 
 from presentation_search.api import create_app
@@ -25,13 +26,58 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def synthetic_template(path: Path, color: str, label: str) -> None:
     ppt = Presentation()
+    original_width = int(ppt.slide_width)
     ppt.slide_width, ppt.slide_height = Inches(13.333333), Inches(7.5)
+    horizontal_scale = int(ppt.slide_width) / original_width
+    for master in ppt.slide_masters:
+        for shape in master.shapes:
+            shape.left = round(shape.left * horizontal_scale)
+            shape.width = round(shape.width * horizontal_scale)
+        for layout in master.slide_layouts:
+            for shape in layout.shapes:
+                shape.left = round(shape.left * horizontal_scale)
+                shape.width = round(shape.width * horizontal_scale)
+
+    def placeholder(layout_index, placeholder_type, occurrence=0):
+        matches = [shape for shape in ppt.slide_layouts[layout_index].placeholders
+                   if shape.placeholder_format.type == placeholder_type]
+        return matches[occurrence]
+
+    title = placeholder(0, PP_PLACEHOLDER.CENTER_TITLE)
+    title.left, title.top, title.width, title.height = (
+        Inches(1.5), Inches(1.0), Inches(10.8), Inches(2.5)
+    )
+    subtitle = placeholder(0, PP_PLACEHOLDER.SUBTITLE)
+    subtitle.left, subtitle.top, subtitle.width, subtitle.height = (
+        Inches(1.7), Inches(3.65), Inches(10.0), Inches(2.7)
+    )
+    for layout_index in (1, 5):
+        content_title = placeholder(layout_index, PP_PLACEHOLDER.TITLE)
+        content_title.left, content_title.top, content_title.width, content_title.height = (
+            Inches(0.75), Inches(0.3), Inches(11.8), Inches(1.15)
+        )
+    content = placeholder(1, PP_PLACEHOLDER.OBJECT)
+    content.left, content.top, content.width, content.height = (
+        Inches(0.75), Inches(1.45), Inches(11.8), Inches(5.55)
+    )
+    two_content_title = placeholder(3, PP_PLACEHOLDER.TITLE)
+    two_content_title.left, two_content_title.top, two_content_title.width, two_content_title.height = (
+        Inches(0.75), Inches(0.3), Inches(11.8), Inches(1.15)
+    )
+    left_content = placeholder(3, PP_PLACEHOLDER.OBJECT, 0)
+    right_content = placeholder(3, PP_PLACEHOLDER.OBJECT, 1)
+    left_content.left, left_content.top, left_content.width, left_content.height = (
+        Inches(0.6), Inches(1.45), Inches(5.95), Inches(5.55)
+    )
+    right_content.left, right_content.top, right_content.width, right_content.height = (
+        Inches(6.78), Inches(1.45), Inches(5.95), Inches(5.55)
+    )
     ppt.slide_master.background.fill.solid()
     ppt.slide_master.background.fill.fore_color.rgb = RGBColor.from_string(color)
     sample = ppt.slides.add_slide(ppt.slide_layouts[6])
-    footer = sample.shapes.add_textbox(Inches(0.8), Inches(7.0), Inches(11.5), Inches(0.3))
+    footer = sample.shapes.add_textbox(Inches(0.8), Inches(7.25), Inches(11.5), Inches(0.16))
     footer.text = label + " — SYNTHETIC TEMPLATE"
-    footer.text_frame.paragraphs[0].font.size = Pt(12)
+    footer.text_frame.paragraphs[0].font.size = Pt(8)
     brand = deepcopy(footer._element)
     ids = [int(n.get("id")) for n in ppt.slide_master._element.iter(P + "cNvPr")]
     brand.find(".//" + P + "cNvPr").set("id", str(max(ids) + 1))

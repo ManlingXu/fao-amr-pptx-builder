@@ -32,7 +32,52 @@ python scripts/run_public_corpus_demo.py --corpus-dir .local/amr --sector animal
 
 候选结果列出课件标题与原始页码。在终端输入 `why 1` 可以查看第一名命中了哪些词、这些词出现在哪里、日期依据及排序分数。选择候选页、核对顺序，输入 `yes` 后生成本地初稿。`source_map.json` 记录各页的出处和校验值。同一组查询也可以用 `--confirm` 测试自动组装。初稿复制兼容的原始页，原来是图片的内容仍是图片。对外分享或改编前，按来源页核对授权和署名；`license` 为空表示未核实具体复用条款。仓库提供目录和代码，源课件按需从发布方下载。
 
-### 复现赞比亚两页简报
+### 10 页赞比亚 AMR 换模板演示
+
+两页示例主要用于检查检索结果。下面的完整演示固定使用同一份赞比亚原始课件中的 10 页真实内容，同时输出原始版、蓝色模板版和绿色模板版。三份 PPT 的内容、顺序、来源记录和备注一致，适合在现场直接比较换模板前后的效果。
+
+| 输出页 | 原始页 | 内容 |
+|---:|---:|---|
+| 1 | 1 | AMR 与抗菌药物管理标题页 |
+| 2 | 2 | 赞比亚 AMR 背景与耐药问题 |
+| 3 | 3 | 抗菌药物管理在控制 AMR 中的作用 |
+| 4 | 5 | 国家行动计划与五项目标 |
+| 5 | 8 | 养殖、生物安全与早期报告措施 |
+| 6 | 10 | 广播、会议、培训及农户和传统领袖宣传 |
+| 7 | 11 | 合理使用抗生素培训图片 |
+| 8 | 15 | 兽医立法、诊疗指南和物种范围 |
+| 9 | 17 | 家禽、猪和水产养殖 AMR 监测协议 |
+| 10 | 19 | 实验室基础设施和人员能力建设 |
+
+在 Windows PowerShell 的项目根目录运行：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_amr_ten_slide_showcase.py --corpus-dir .local\amr --output-dir build\amr-ten-slide-showcase
+```
+
+结果保存在 `build\amr-ten-slide-showcase`。现场依次打开：
+
+1. `AMR_10_Slide_Original.pptx`：保留原始课件设计。
+2. `AMR_10_Slide_Blue.pptx`：同一批内容应用蓝色演示模板。
+3. `AMR_10_Slide_Green.pptx`：同一批内容再次更换为绿色演示模板。
+
+脚本还保存 `source_map.json`、`slide_analysis.json`、`layout_decisions.json` 和两份版式检查报告。被问到“每页从哪里来”或“程序为什么选这个版式”时，可以打开这些记录说明。
+
+默认蓝色和绿色模板由脚本生成，只用于清楚证明模板能够切换。也可以换成自己的 FAO 模板：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_amr_ten_slide_showcase.py `
+  --corpus-dir .local\amr `
+  --output-dir build\amr-ten-slide-showcase `
+  --template-a "C:\Users\徐曼灵\Documents\FAO_Template.pptx" `
+  --template-b "C:\Users\徐曼灵\Documents\Second_Template.pptx"
+```
+
+请把路径换成电脑上的实际模板文件。模板的颜色、页脚和品牌元素应放在 PowerPoint 的幻灯片母版或版式中；只画在模板示例页上的设计不会自动成为输出背景。
+
+为了让现场每次都得到相同结果，这个本地演示使用预设的 10 页故事线，不调用大语言模型或 Microsoft 服务。它证明 Python 后台能够核对真实来源、组装 10 页、分析页面结构并应用模板。Copilot Studio 中配置的 AI 决策步骤再负责理解自然语言需求、扩展检索词、在真实候选页中重排，以及从模板允许的版式名称中选择布局。
+
+### 两页快速检索检查
 
 以下两个提示分别描述农户宣传与兽医监测。已在动物健康资料中实际运行，并重新打开导出的文件。初稿第 1 页对应赞比亚原课件第 10 页，列出广播、会议、培训及目标人群；第 2 页对应原第 17 页，列出家禽、养猪和水产养殖的监测工作。两页均保留可编辑文字。[赞比亚原始课件](https://drive.google.com/file/d/1sUqmUiCrPjQj25qvbXXYgsQTPYus3NIr/view)
 
