@@ -238,12 +238,26 @@ def _content_area(layout, master, width, height, has_title):
                 continue
     candidates = [b for b in candidates if b[2] > 0 and b[3] > 0]
     if candidates:
-        return max(candidates, key=lambda b: b[2] * b[3])
+        x1 = min(bounds[0] for bounds in candidates)
+        y1 = min(bounds[1] for bounds in candidates)
+        x2 = max(bounds[0] + bounds[2] for bounds in candidates)
+        y2 = max(bounds[1] + bounds[3] for bounds in candidates)
+        return x1, y1, x2 - x1, y2 - y1
     return (round(width * .05), round(height * (.20 if has_title else .08)),
             round(width * .90), round(height * (.70 if has_title else .84)))
 
 
-def _restyle_slide(slide, source_layout, source_master, target_layout, target_master, width, height):
+def _restyle_slide(
+    slide,
+    source_layout,
+    source_master,
+    target_layout,
+    target_master,
+    source_width,
+    source_height,
+    width,
+    height,
+):
     # Shape animation timing depends on grouping and needs a dedicated converter.
     if slide.find(P + "timing") is not None:
         raise ValueError("Template replacement does not support animated source slides.")
@@ -256,6 +270,34 @@ def _restyle_slide(slide, source_layout, source_master, target_layout, target_ma
         if shape.tag in {P + "nvGrpSpPr", P + "grpSpPr", P + "extLst"}:
             continue
         ph = _placeholder(shape)
+        role = _role(shape)
+        # The target template owns page numbering, while empty metadata
+        # placeholders are only authoring prompts. Filled source headers,
+        # footers and dates can contain citations or legal notices, so retain
+        # them outside the reflowed content group at the same relative page
+        # position.
+        if ph is not None and role == "sldNum":
+            tree.remove(shape)
+            continue
+        if ph is not None and role in {"dt", "date", "ftr", "footer", "hdr", "header"}:
+            has_value = (
+                any((text.text or "").strip() for text in shape.iter(A + "t"))
+                or any(key.startswith("{" + R + "}") for node in shape.iter() for key in node.attrib)
+            )
+            if not has_value:
+                tree.remove(shape)
+                continue
+            transform = _resolved_transform(shape, source_layout, source_master)
+            x, y, shape_width, shape_height = _bounds(transform)
+            scaled = deepcopy(transform)
+            off, ext = scaled.find(A + "off"), scaled.find(A + "ext")
+            off.set("x", str(round(x * width / source_width)))
+            off.set("y", str(round(y * height / source_height)))
+            ext.set("cx", str(round(shape_width * width / source_width)))
+            ext.set("cy", str(round(shape_height * height / source_height)))
+            _set_transform(shape, scaled)
+            ph.getparent().remove(ph)
+            continue
         # Empty placeholders are authoring prompts, not user content.
         if (shape.tag == P + "sp" and ph is not None
                 and not any((t.text or "").strip() for t in shape.iter(A + "t"))
@@ -342,6 +384,7 @@ def _merged_package(source, template, layouts, layout_overrides=None):
             ET.SubElement(types, CT + "Override", PartName="/" + mapped,
                           ContentType=template.mime(name))
     root = _parse(blobs[PRES])
+    source_width, source_height = _dims(root.find(P + "sldSz"))
     target_size = template.root.find(P + "sldSz")
     root.replace(root.find(P + "sldSz"), deepcopy(target_size))
     default = root.find(P + "defaultTextStyle")
@@ -391,7 +434,17 @@ def _merged_package(source, template, layouts, layout_overrides=None):
             slide_number,
             _select_layout(layouts, old_layout_node.get("type"), has_title),
         )
-        _restyle_slide(node, old_layout_node, old_master, target_node, master_node, width, height)
+        _restyle_slide(
+            node,
+            old_layout_node,
+            old_master,
+            target_node,
+            master_node,
+            source_width,
+            source_height,
+            width,
+            height,
+        )
         new_rels = _relations()
         for rid, (kind, rel_target, external) in rels.items():
             _rel(new_rels, rid, kind,

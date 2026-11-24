@@ -25,6 +25,18 @@ Search 3,868 original slides on antimicrobial use, resistance and stewardship. T
 
 [30 个来源网站与课件数量](examples/public_corpus/amr/SOURCES_CN.md) · [选页逻辑与 AI 的作用](docs/AMR_SELECTION_LOGIC_CN.md) · [AMR 专题演示与下载步骤](examples/public_corpus/amr/README.md) · [Browse the verified AMR catalogue](examples/public_corpus/amr/catalog.csv)
 
+### Run the 10-slide template showcase
+
+After downloading the AMR corpus, create three editable versions of the same ten-slide Zambia presentation:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_amr_ten_slide_showcase.py --corpus-dir .local\amr --output-dir build\amr-ten-slide-showcase
+```
+
+Open `AMR_10_Slide_Original.pptx`, `AMR_10_Slide_Blue.pptx` and `AMR_10_Slide_Green.pptx` in that order to compare the original design with two template treatments. The script verifies that slide order, provenance, substantive text and notes remain aligned. Pass `--template-a` and `--template-b` to use two local PPTX/POTX templates instead of the generated demonstration templates.
+
+This deterministic local showcase demonstrates ten-slide assembly, structural analysis, template application and provenance preservation. It does not call an LLM or Microsoft service and does not represent Copilot's grounded reranking or layout decisions.
+
 ## Try the 120-deck public demo
 
 [中文演示与运行步骤 · Public corpus walkthrough](examples/public_corpus/README.md) · [Download the example PowerPoint with credits](examples/public_corpus/Vietnam_AMR_demo.zip) · [Browse the 120 sources](examples/public_corpus/catalog.csv)
