@@ -17,7 +17,13 @@ Find approved existing slides, propose an audience-specific presentation storyli
 
 The [V2 plan workflow](docs/V2_WORKFLOW_EN.md) adds four versioned planning tools (Create/Read/Revise/Finalize), with real-user authentication and current-revision checks. The [template upload workflow](docs/TEMPLATE_WORKFLOW_EN.md) includes file-input mapping and two new tools. Backend template processing is implemented; chat attachment support, connector configuration and Teams publication still require tenant validation. Original direct formatting is retained, so applying a template does not automatically redesign every slide.
 
-This version has no new factual-slide generation, PDF/DOCX ingestion, separate chat UI, vector search or additional backend LLM. The local API demonstration uses synthetic content and does not provide a Copilot conversation.
+This version has no new factual-slide generation, PDF/DOCX ingestion, separate chat UI, vector search or additional backend LLM. Local demos use scripted or interactive selections. Copilot conversation requires a connected agent.
+
+## Try the 120-deck public demo
+
+[中文演示与运行步骤 · Public corpus walkthrough](examples/public_corpus/README.md) · [Download the example PowerPoint with credits](examples/public_corpus/Vietnam_AMR_demo.zip) · [Browse the 120 sources](examples/public_corpus/catalog.csv)
+
+The optional public corpus contains 2,322 slides across 120 verified presentations on AMR, One Health, food safety and livestock. Search the full corpus, review source pages and related versions, choose individual slides and confirm an editable draft. A worked example selects three original slides from two presentations for a briefing on Vietnam. The four synthetic decks below provide a quick offline check.
 
 ## Try locally
 
@@ -31,7 +37,7 @@ python -m venv .venv
 .venv/bin/python scripts/run_template_demo.py
 ```
 
-On Windows, substitute `.venv/Scripts/python.exe` for `.venv/bin/python`. The V1 demo saves a three-slide draft and provenance in `examples/output/`. The V2 demo saves a revised storyline, source map and editable draft in `examples/output/v2/`. It calls no Microsoft service or model. All included sample decks are synthetic; they are not FAO evidence.
+On Windows, substitute `.venv/Scripts/python.exe` for `.venv/bin/python`. The V1 demo saves a three-slide draft and provenance in `examples/output/`. The V2 demo saves a revised storyline, source map and editable draft in `examples/output/v2/`. It calls no Microsoft service or model. The four source fixtures in `data/presentations/` are synthetic.
 
 For the local API, run `start-local.cmd` on Windows or `bash start-local.sh` on macOS/Linux, then open <http://127.0.0.1:8000/docs>.
 
@@ -52,7 +58,7 @@ For the local API, run `start-local.cmd` on Windows or `bash start-local.sh` on 
 
 Production uses Entra user authentication and a separately authorized Graph service identity. The API-key definition is for a local or controlled pilot. `flow-design.json` is a configuration blueprint, not an importable agent or solution. Follow the [Chinese](docs/COPILOT_STUDIO_CN.md) or [English](docs/COPILOT_STUDIO_EN.md) setup guide.
 
-**V2 is backend code plus a Copilot topic blueprint, not an already-published Teams agent.** The LLM plans content only once Copilot Studio has been configured; local tests are synthetic and use deterministic section queries.
+**V2 is backend code plus a Copilot topic blueprint, not an already-published Teams agent.** The LLM plans content only once Copilot Studio has been configured; the local demos use deterministic section queries and support both synthetic fixtures and the opt-in public corpus.
 
 ## Operating boundary
 
@@ -72,5 +78,6 @@ Live tenant OAuth, Graph grants, hosting, connector import and Teams publication
 | `integrations/copilot-studio/` | Two connector templates, instructions and configuration blueprint |
 | `scripts/`, `deploy/` | Local run, connector export, packaging and host setup |
 | `data/presentations/`, `examples/output/` | Synthetic sources and demo result |
+| `examples/public_corpus/` | Verified public download catalogue, walkthrough and worked PowerPoint example |
 | `docs/`, `tests/` | Bilingual setup, acceptance and focused regression tests |
 | `.github/workflows/tests.yml` | Proposed test-only CI; no deployment or tenant credentials |
