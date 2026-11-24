@@ -3,13 +3,15 @@ from __future__ import annotations
 import re
 from collections import Counter
 from datetime import datetime
+from math import log
 
 from .freshness import freshness_score
 from .models import SearchResult, SlideDocument
 
 TOKEN_RE = re.compile(r"[^\W_]+")
-STOPWORDS = set(
-    "a an and are for from in is of on or our presentation slide the this to with material find show me latest newest recent current updated update".split()
+RECENCY_TERMS = {"latest", "newest", "recent", "current", "updated", "update"}
+STOPWORDS = RECENCY_TERMS | set(
+    "a an and are for from in is of on or our presentation slide the this to with material find show me".split()
 )
 
 
@@ -34,10 +36,23 @@ def date_order(slide: SlideDocument) -> tuple[int, str, float]:
 
 class SearchIndex:
     def __init__(self, slides: list[SlideDocument] | None = None):
-        self.slides = list(slides or [])
+        self.replace(slides or [])
+
+    @property
+    def slides(self) -> list[SlideDocument]:
+        return self._snapshot[0]
 
     def replace(self, slides: list[SlideDocument]) -> None:
-        self.slides = list(slides)
+        documents = list(slides)
+        fields = []
+        document_frequency = Counter()
+        for slide in documents:
+            title = set(tokenize(slide.title))
+            terms = title.union(tokenize(" ".join((slide.text, slide.notes, slide.deck_name, slide.deck_title))))
+            fields.append((title, terms))
+            document_frequency.update(terms)
+        # Publish the new documents, their token fields and frequencies together.
+        self._snapshot = documents, fields, document_frequency
 
     def __len__(self) -> int:
         return len(self.slides)
@@ -55,32 +70,40 @@ class SearchIndex:
             (s for s in slides if s.family_key == selected.family_key), key=date_order, reverse=True
         )
 
-    def _relevance(self, query_tokens: list[str], slide: SlideDocument) -> float:
-        if not query_tokens:
-            return 0.0
-        title_tokens = set(tokenize(slide.title))
-        body_tokens = set(tokenize(" ".join([slide.text, slide.notes, slide.deck_name])))
-        unique = set(query_tokens)
-        coverage = (2 * len(unique & title_tokens) + len(unique & body_tokens)) / (len(unique) * 3)
-        phrase_bonus = 0.1 if " ".join(query_tokens) in f"{slide.title} {slide.text}".lower() else 0.0
-        return min(1.0, coverage + phrase_bonus)
-
     def search(self, query: str, limit: int = 15, latest_only: bool = True) -> list[SearchResult]:
         query_tokens = tokenize(query)
-        slides = self.slides
+        if not query_tokens:
+            return []
+        slides, fields, frequencies = self._snapshot
+        # Smoothed inverse document frequency gives specific terms more weight.
+        # Words outside this corpus carry only the base weight.
+        weights = {
+            term: 1 + log((len(slides) + 1) / (frequencies[term] + 1)) if term in frequencies else 1.0
+            for term in set(query_tokens)
+        }
+        denominator = 3 * sum(weights.values())
+        phrase = " ".join(query_tokens)
+        requests_recency = not RECENCY_TERMS.isdisjoint(TOKEN_RE.findall(query.lower()))
         counts = Counter(s.family_key for s in slides)
         best = {}
         for slide in slides:
             best[slide.family_key] = max(best.get(slide.family_key, (0, "", 0.0)), date_order(slide))
         candidates = []
-        for slide in slides:
+        for slide, (title, terms) in zip(slides, fields):
             latest = date_order(slide) == best[slide.family_key]
             if latest_only and not latest:
                 continue
-            relevance = self._relevance(query_tokens, slide)
-            if not relevance:
+            matches = weights.keys() & terms
+            if not matches:
                 continue
+            # Full-slide matches supply the evidence; titles receive an extra boost.
+            coverage = sum(weights[t] * (3 if t in title else 2) for t in matches) / denominator
+            phrase_bonus = 0.1 if phrase in f"{slide.title} {slide.text}".lower() else 0.0
+            relevance = min(1.0, coverage + phrase_bonus)
             fresh = freshness_score(slide.effective_year, slide.date_confidence, datetime.now().year)
+            # For a content question, recency boosts evidence already matched.
+            # A direct request for recent material keeps the full date weighting.
+            freshness_weight = 0.22 if requests_recency else 0.22 * relevance
             status = (
                 "DATE UNKNOWN" if not period(slide) else ("LATEST" if latest else "NEWER VERSION AVAILABLE")
             )
@@ -89,7 +112,7 @@ class SearchIndex:
                     slide=slide,
                     relevance_score=round(relevance, 6),
                     freshness_score=fresh,
-                    final_score=round(relevance * 0.78 + fresh * 0.22, 6),
+                    final_score=round(relevance * 0.78 + fresh * freshness_weight, 6),
                     freshness_status=status,
                     related_versions=counts[slide.family_key],
                     explanation=[f"Date basis: {slide.date_reason}"],

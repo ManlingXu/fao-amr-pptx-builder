@@ -1,5 +1,7 @@
 # Public PowerPoint demo
 
+**AMR 专题演示**可检索 150 份原始课件，并单独筛选动物健康及 One Health 资料。[专题目录与运行步骤](amr/README.md)
+
 [下载实测样例 · Download the worked example](Vietnam_AMR_demo.zip) · [查看 120 份来源 · Browse the catalogue](catalog.csv)
 
 原版有 4 份合成课件、6 页。本演示使用 120 份不同的公开 PowerPoint，共 2,322 页，原始文件约 579 MB。113 份来自 CGIAR 的 CGSpace，涉及 AMR、One Health、食品安全、畜牧业和生计。另有 7 份英国兽药管理局的年度监测报告，覆盖 2019–2025 报告年。按标题统计，18 份直接提到抗微生物药物或抗生素。所有课件均已下载、按内容去重、核对 SHA-256 并用项目的实际解析器建立索引。

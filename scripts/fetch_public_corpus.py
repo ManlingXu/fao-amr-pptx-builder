@@ -14,14 +14,15 @@ from contextlib import contextmanager
 from pathlib import Path, PureWindowsPath
 from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
+from zipfile import ZipFile
 
 from presentation_search.pptx_parser import parse_presentation
 from presentation_search.providers.base import MAX_FILE_BYTES, write_bounded
 
 ROOT = Path(__file__).resolve().parents[1]
 FIELDS = ("id", "title", "source_page", "download_url")
-CREDIT_FIELDS = ("author", "license", "issued")
-VERIFIED_FIELDS = (*FIELDS, *CREDIT_FIELDS, "sha256", "slide_count")
+CREDIT_FIELDS = ("author", "license", "issued", "publisher", "sector", "topic", "series", "language", "training_country", "evidence_slide")
+VERIFIED_FIELDS = (*FIELDS, *CREDIT_FIELDS, "zip_member", "sha256", "slide_count")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
@@ -34,6 +35,16 @@ def read_catalog(path: Path) -> list[dict]:
         ids = set()
         for number, raw in enumerate(reader, 2):
             row = {key: (raw.get(key) or "").strip() for key in (*FIELDS, *CREDIT_FIELDS, "sha256")}
+            member = raw.get("zip_member") or ""
+            if member and (
+                not member.lower().endswith(".pptx")
+                or "\\" in member
+                or PureWindowsPath(member).drive
+                or any(part in {"", ".", ".."} for part in member.split("/"))
+                or any(ord(char) < 32 for char in member)
+            ):
+                raise ValueError(f"Line {number}: invalid relative PPTX zip_member {member!r}")
+            row["zip_member"] = member
             identifier = row["id"]
             if (
                 not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}", identifier)
@@ -65,7 +76,10 @@ def digest(path: Path) -> str:
 
 def download_deck(row, opener, cache, temporary):
     url = row["download_url"]
-    receipt = cache / (hashlib.sha256(url.encode()).hexdigest() + ".json")
+    member = row["zip_member"]
+    # Keep the URL-only key for receipts written by older direct-download runs.
+    key = url if not member else "\0" + url + "\0" + member
+    receipt = cache / (hashlib.sha256(key.encode()).hexdigest() + ".json")
     # The URL receipt is stored separately from the current selection, so an
     # interrupted or smaller run can reuse its verified files on a later run.
     if receipt.is_file():
@@ -88,6 +102,21 @@ def download_deck(row, opener, cache, temporary):
         if length.isdigit() and int(length) > MAX_FILE_BYTES:
             raise ValueError("A source deck exceeds the 64 MiB limit")
         write_bounded(path, iter(lambda: response.read(64 * 1024), b""))
+    if member:
+        extracted = temporary / (row["id"] + ".member")
+        try:
+            with ZipFile(path) as archive:
+                matches = [info for info in archive.infolist() if info.filename == member]
+                if len(matches) != 1:
+                    raise ValueError("Publisher ZIP must contain exactly one entry named " + repr(member))
+                entry = matches[0]
+                if entry.file_size > MAX_FILE_BYTES:
+                    raise ValueError("The selected PowerPoint exceeds the 64 MiB limit")
+                with archive.open(entry) as stream:
+                    write_bounded(extracted, iter(lambda: stream.read(64 * 1024), b""))
+        finally:
+            path.unlink(missing_ok=True)
+        path = extracted
     checksum = digest(path)
     if row["sha256"] and row["sha256"] != checksum:
         raise ValueError("Downloaded SHA-256 differs from the catalogue")
@@ -148,7 +177,10 @@ def fetch_catalog(catalog, corpus_dir, *, limit=None, workers=3, opener=urlopen)
 
             for row, (result, error) in zip(rows, executor.map(attempt, rows)):
                 if error is not None:
-                    failed.append({"id": row["id"], "download_url": row["download_url"], "error": error})
+                    failure = {"id": row["id"], "download_url": row["download_url"], "error": error}
+                    if row["zip_member"]:
+                        failure["zip_member"] = row["zip_member"]
+                    failed.append(failure)
                     continue
                 checksum, count = result
                 if checksum in seen:
@@ -169,6 +201,12 @@ def fetch_catalog(catalog, corpus_dir, *, limit=None, workers=3, opener=urlopen)
             "slides": sum(item["slide_count"] for item in verified),
             "duplicates": duplicates, "failed": failed,
         }
+        archive_members = [
+            {key: row[key] for key in ("id", "download_url", "zip_member")}
+            for row in rows if row["zip_member"]
+        ]
+        if archive_members:
+            report["archive_members"] = archive_members
         with (temporary / "verified.csv").open("w", encoding="utf-8", newline="") as stream:
             writer = csv.DictWriter(stream, fieldnames=VERIFIED_FIELDS)
             writer.writeheader()
