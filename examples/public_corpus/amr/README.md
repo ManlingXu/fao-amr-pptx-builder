@@ -1,6 +1,6 @@
 # AMR 专题 PowerPoint 演示
 
-[浏览 150 份课件及原始来源](catalog.csv) · [检索测试题](queries.csv) · [综合主题的 120 份演示库](../README.md)
+[30 个来源网站与数量](SOURCES_CN.md) · [选页原理与 AI 的作用](../../../docs/AMR_SELECTION_LOGIC_CN.md) · [浏览 150 份课件及原始来源](catalog.csv) · [检索测试题](queries.csv) · [综合主题的 120 份演示库](../README.md)
 
 这套资料供本地测试从现有课件中检索、选页和组装 PowerPoint 的流程。2026 年 11 月 24 日下载核对了 **150 份不同的原始 PPTX，共 3,868 页**，原始 PPTX 合计约 973 MB。其中 18 份也在综合演示库中，132 份为新增来源文件。
 
@@ -30,7 +30,7 @@ python scripts/fetch_public_corpus.py --catalog examples/public_corpus/amr/catal
 python scripts/run_public_corpus_demo.py --corpus-dir .local/amr --sector animal --sector one-health --query "What target did the French Ecoantibio plan set to reduce animal exposure to antibiotics?" --interactive
 ```
 
-候选结果列出课件标题与原始页码。在终端选择候选页、核对顺序，输入 `yes` 后生成本地初稿。`source_map.json` 记录各页的出处和校验值。同一组查询也可以用 `--confirm` 测试自动组装。初稿复制兼容的原始页，原来是图片的内容仍是图片。对外分享或改编前，按来源页核对授权和署名；`license` 为空表示未核实具体复用条款。仓库提供目录和代码，源课件按需从发布方下载。
+候选结果列出课件标题与原始页码。在终端输入 `why 1` 可以查看第一名命中了哪些词、这些词出现在哪里、日期依据及排序分数。选择候选页、核对顺序，输入 `yes` 后生成本地初稿。`source_map.json` 记录各页的出处和校验值。同一组查询也可以用 `--confirm` 测试自动组装。初稿复制兼容的原始页，原来是图片的内容仍是图片。对外分享或改编前，按来源页核对授权和署名；`license` 为空表示未核实具体复用条款。仓库提供目录和代码，源课件按需从发布方下载。
 
 ### 复现赞比亚两页简报
 
@@ -57,10 +57,33 @@ python scripts/check_amr_retrieval.py --all-sectors
 | 捷克 300 头奶牛农场初期的健康与管理问题 | 1 | 10 |
 | 赞比亚如何向农户和传统领袖宣传合理用药 | 1 | 10 |
 
-### 发现后续新增课件
+使用 `--language zh` 可把同样的测试意图换成中文，仍以相同的原始课件和页码评分。动物健康和 One Health 范围中，英文命中 5/5 个预期原页，中文命中 2/5。两组测试均使用本地检索器。[中英文逐项解释](../../../docs/AMR_SELECTION_LOGIC_CN.md)
+
+## 爬虫怎样发现和复核新材料
+
+```bash
+python scripts/discover_amr_training.py --source all
+```
+
+爬虫从三个发布方的公开入口读取链接和资料记录。
+
+| 来源 | 发现课件的路径 |
+|---|---|
+| 欧盟农户与兽医培训项目 | 读取课程资料页中的国家、场次和原始 PPTX 链接。同一文件在多场出现时合并。 |
+| 英国兽药管理局 | 从 GOV.UK 的 UK-VARSS 发布集合进入各年度记录，核对附件的文件类型和官方地址。 |
+| CGIAR 的 CGSpace | 按 AMR、AMU、抗菌药等英文词检索演示文稿记录，按标题筛选畜牧、农业、One Health 和用药管理等主题，再从记录中取出版方的原始 PPTX 附件。标题或主题词不在这些规则中的课件可能漏收。 |
+
+2026 年 11 月 24 日实测得到 256 个课件链接。欧盟课程库有 234 个（32 个已收录、202 个待复核），英国年度材料有 7 个（均已收录），CGSpace 有 15 个（均已收录）。这 54 个已收录链接是完整目录的一部分。
+
+每次扫描新建一个本地运行目录，终端会打印其路径。`report.json` 逐站记录请求次数、成功、空结果或失败。各站的清单分别保存，完整扫描另外生成合并的 `candidates.csv`。链接与已有目录比对，已经收录的标为 `listed`，其余标为 `candidate_unreviewed`。扫描中断时，运行 `python scripts/discover_amr_training.py --resume 上次运行目录` 会复用完整的站点清单，重试尚未完成的来源。省略 `--source` 可继续使用原有的欧盟单站扫描，输出兼容的 `.local/amr-training-candidates.csv`。
+
+### 下载指定候选，核对原件是否重复
+
+下面的例子从欧盟扫描结果中选择同一节课的英文和德文链接。多站扫描的 `candidates.csv` 也可以作为输入。
 
 ```bash
 python scripts/discover_amr_training.py
+python scripts/review_amr_candidates.py --candidates .local/amr-training-candidates.csv --url https://www.amrfvtraining.eu/wp-content/uploads/2025/02/03-L1_eng.pptx --url https://www.amrfvtraining.eu/wp-content/uploads/2025/02/03-L1_de_revised.pptx
 ```
 
-本次扫描发现 234 个不同的 PPTX 链接，32 个已收录，另有 202 个待复核，其中包含同一课件的翻译和不同场次版本。脚本扫描欧盟项目的公开资料页，将课件链接与已收录目录比对，并保存到 `.local/amr-training-candidates.csv`。同一课件可能出现在多个国家场次，也可能另有翻译或轻微改版。未收录链接标为 `candidate_unreviewed`，经正文复核和去重后才能进入正式检索库。该命令可以手动重跑。
+复核程序实际下载指定的源文件、核对 PowerPoint 能否解析、统计原始页数，再将 SHA-256 与已收录目录及本批文件比对。实测两个版本各 22 页。英文版与目录原件完全一致，德文版的文件校验值不同；出版方的课程场次和标题显示两者是同一讲义的不同语言版本。`review.json` 保留逐项结论与失败原因。审核人仍需核对内容、翻译或近似版本、原始证据页和复用条款，然后决定是否入库。[下载复核代码](../../../scripts/review_amr_candidates.py)

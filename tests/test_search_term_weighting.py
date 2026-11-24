@@ -39,7 +39,11 @@ def test_replace_refreshes_documents_fields_and_document_frequency_together():
 def test_catalogue_title_supplies_context_separately_from_original_slide_text():
     slide = document("opaque-id", "Community outreach", "Radio broadcasts and public meetings")
     slide.deck_title = "National stewardship in Kenya"
-    assert SearchIndex([slide]).search("Kenya")[0].slide is slide
+    result = SearchIndex([slide]).search("Kenya meetings community")[0]
+    assert result.slide is slide
+    assert "Source name only: kenya" in result.explanation
+    assert "Slide text or notes: meetings" in result.explanation
+    assert "Slide title: community" in result.explanation
     assert "Kenya" not in slide.text
 
 

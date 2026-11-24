@@ -21,9 +21,9 @@ This version has no new factual-slide generation, PDF/DOCX ingestion, separate c
 
 ## Try the 150-deck AMR collection
 
-Search 3,868 original slides on antimicrobial use, resistance and stewardship. The animal and One Health filters cover 70 presentations. Each entry lists a representative original slide, publisher and pinned download. The local demo supports slide selection, provenance review and editable draft export. A discovery command can rescan the EU farmer and veterinarian training library for new candidates.
+Search 3,868 original slides on antimicrobial use, resistance and stewardship. The animal and One Health filters cover 70 presentations. Each entry lists a representative original slide, publisher and pinned download. The local demo supports slide selection, provenance review and editable draft export. The discovery command checks the EU farmer/veterinarian training library, UK annual surveillance releases and CGIAR presentation records. Inspect candidates and compare file hashes before adding a source.
 
-[AMR 专题演示与下载步骤](examples/public_corpus/amr/README.md) · [Browse the verified AMR catalogue](examples/public_corpus/amr/catalog.csv)
+[30 个来源网站与课件数量](examples/public_corpus/amr/SOURCES_CN.md) · [选页逻辑与 AI 的作用](docs/AMR_SELECTION_LOGIC_CN.md) · [AMR 专题演示与下载步骤](examples/public_corpus/amr/README.md) · [Browse the verified AMR catalogue](examples/public_corpus/amr/catalog.csv)
 
 ## Try the 120-deck public demo
 
