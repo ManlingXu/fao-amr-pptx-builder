@@ -2,17 +2,25 @@
 from __future__ import annotations
 
 import json
+import re
+import math
 import shutil
 from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from lxml import etree as ET
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.dml import MSO_THEME_COLOR
 from pptx.enum.shapes import MSO_SHAPE, PP_PLACEHOLDER
+from pptx.enum.text import PP_ALIGN
+from pptx.opc.constants import CONTENT_TYPE as CT, RELATIONSHIP_TYPE as RT
+from pptx.parts.chart import ChartPart
 from pptx.util import Inches, Pt
+from xlsxwriter import Workbook
+from xlsxwriter.utility import xl_rowcol_to_cell
 
 from .assembly import P, assemble_slides
 from .brief_index import read_verified_manifest
@@ -131,16 +139,24 @@ def _demo_template(path):
 
 
 def _source_paragraphs(slide):
-    """Keep authored paragraphs together. Do not turn isolated table cells into claims."""
+    """Select readable slide text, keeping the original paragraphs and their order."""
     blocks = []
-    for shape in slide.shapes:
-        if shape.has_text_frame and shape != slide.shapes.title:
+    def visit(shapes):
+        for shape in shapes:
+            if shape._element.tag == P + "grpSp":
+                visit(shape.shapes)
+            if not shape.has_text_frame:
+                continue
             if shape.is_placeholder and shape.placeholder_format.type in (
                 PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE, PP_PLACEHOLDER.DATE,
                 PP_PLACEHOLDER.FOOTER, PP_PLACEHOLDER.SLIDE_NUMBER,
             ):
                 continue
-            blocks.extend(p.text.strip() for p in shape.text_frame.paragraphs if p.text.strip())
+            for paragraph in shape.text_frame.paragraphs:
+                text = ' '.join(paragraph.text.split())
+                if text and not re.match(r"^(?:\d{1,4}$|©|https?://|(?:source|sources|reference)\s*:|(?:UK[- ]?)?VARSS REPORT\b)", text, re.I):
+                    blocks.append(text)
+    visit(slide.shapes)
     return list(dict.fromkeys(blocks))
 
 
@@ -148,7 +164,14 @@ def _dominant_image(slide, deck):
     """A large, uncropped, unrotated JPEG/PNG on the selected page can accompany its excerpt."""
     images = []
     for shape in slide.shapes:
-        if shape._element.tag != P + "pic" or shape.rotation or shape.width * shape.height < deck.slide_width * deck.slide_height * .18:
+        if shape._element.tag != P + "pic" or shape.rotation or not shape.height:
+            continue
+        area = (shape.width / deck.slide_width) * (shape.height / deck.slide_height)
+        # Some publishers embed an entire single-row annual data table as a wide
+        # picture. Thin header strips and logos should not displace the figure.
+        wide_figure = (shape.width / deck.slide_width >= .7 and
+                       2 <= shape.width / shape.height <= 14 and area >= .065)
+        if area < .18 and not wide_figure:
             continue
         if any(abs(v) > .001 for v in (shape.crop_left, shape.crop_right, shape.crop_top, shape.crop_bottom)):
             continue
@@ -158,26 +181,75 @@ def _dominant_image(slide, deck):
     return max(images, key=lambda item: item[0])[1] if images else None
 
 
-def _excerpt_text(page, slide, evidence, limit):
-    parts = _source_paragraphs(slide)
-    normalized = " ".join(evidence.split())
-    matches = [i for i, text in enumerate(parts) if normalized in " ".join(text.split())]
-    start = matches[0] if matches else 0
-    selected = []
-    if normalized not in " ".join(" ".join(parts).split()) and evidence != page.title:
-        selected.append(evidence)
-    for part in parts[start:start + 5]:
-        if sum(len(s) for s in selected) + len(part) > limit and selected:
+def _excerpt_heading(page, slide, parts, record):
+    # Many publishers draw a heading in a regular shape named “Title” without a
+    # title placeholder. Its text is stronger evidence than a synthetic Slide N.
+    title = page.title
+    if not title or re.fullmatch(r"Slide \d+", title):
+        named = [s.text.strip() for s in slide.shapes if s.has_text_frame and
+                 re.match(r"(?:title|标题)\b", s.name, re.I) and s.text.strip()]
+        title = next(iter(named), "")
+    if not title:
+        title = next((p for p in parts if 4 < len(p) < 100), record["deckTitle"])
+    return ' '.join(title.split())
+
+
+def _specific_heading(title, parts, evidence):
+    """Use a brief, intact quantitative statement or caption from the source."""
+    if len(title) > 52:
+        return title
+    fragments = [' '.join(line.split()) for line in evidence.splitlines() if len(line.strip()) >= 12]
+    for paragraph in parts:
+        if not any(f in paragraph or paragraph in f for f in fragments):
+            continue
+        # A parenthesized figure qualifier stays in the caption and in the notes.
+        subject = paragraph.split(" (", 1)[0].strip()
+        if (28 <= len(subject) <= 125 and re.search(r"\b(?:19|20)\d{2}\b", subject)
+                and (len(subject) < len(paragraph) or re.search(r"\b\d[\d,.]*\s*(?:%|tonnes?\b|kg\b|mg\b)", subject))):
+            return subject
+    return title
+
+
+def _excerpt_text(page, parts, evidence, heading, limit):
+    fragments = [' '.join(line.split()) for line in evidence.splitlines() if line.strip()]
+    evidence = ' '.join(evidence.split())
+    parts = [p for p in parts if p != heading]
+    # The selected phrase may lie in the middle of a sentence. Prefer its full
+    # paragraph from the actual source, including any qualifier or population.
+    matches = [(min(len(f), len(p)), p) for p in parts for f in fragments if f in p or p in f]
+    first = max(matches, key=lambda match: match[0])[1] if matches else evidence
+    if first not in parts and first != heading:
+        note = next((' '.join(p.split()) for p in page.notes.splitlines() if evidence in ' '.join(p.split())), '')
+        first = note or first
+    caution = re.compile(r"\b(?:should not|not (?:directly )?comparable|cannot|subject to|caution|biased|biases)\b|不宜|不能|不可|偏倚", re.I)
+    caveats = [s for p in parts for s in re.split(r'(?<=[.!?。！？])\s+', p) if caution.search(s)]
+    candidates = [first, *caveats, *parts]
+    included = []
+    for p in candidates:
+        if not p or p == heading or any(p in current for current in included):
+            continue
+        if len(p) > limit and not included:
+            # Preserve the evidence and complete sentences wherever possible. The
+            # full original text and notes remain in the slide's speaker notes.
+            sentences = re.split(r'(?<=[.!?。！？])\s+', p)
+            match = next((s for s in sentences if evidence in s), p)
+            if len(match) > limit:
+                # Select the containing excerpt from a long paragraph, avoiding
+                # any impression that the visibly abbreviated text is complete.
+                start = max(0, match.find(evidence))
+                snippet = match[start:start + limit - 2]
+                if ' ' in snippet and start + len(snippet) < len(match):
+                    snippet = snippet.rsplit(' ', 1)[0]
+                match = ('…' if start else '') + snippet + ('…' if start + len(snippet) < len(match) else '')
+            p = match
+        if sum(map(len, included)) + len(p) <= limit:
+            included.append(p)
+        if len(included) >= 4:
             break
-        selected.append(part)
-    if not selected:
-        selected.append(evidence)
-    result = "\n\n".join(selected)
-    if len(result) > limit:
-        # A literal continuation mark distinguishes an excerpt from a full source claim.
-        shortened = result[:limit].rsplit(" ", 1)[0]
-        result = shortened.rstrip() + "…"
-    return result
+    while included and (included[-1].endswith((':', '：')) or
+                        included[-1].casefold() in {'key findings', 'findings', 'results', 'summary'}):
+        included.pop()
+    return '\n\n'.join(included)
 
 
 def _source_table(slide, evidence):
@@ -194,6 +266,97 @@ def _source_table(slide, evidence):
                 return rows
             return []
     return None
+
+
+_CHART = "{http://schemas.openxmlformats.org/drawingml/2006/chart}"
+_DRAW = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+_COMPAT = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
+
+
+def _chart_workbook(space):
+    """Rebuild only the cached chart cells and replace every original range reference."""
+    formulas = space.xpath(".//c:f")
+    if not 1 <= len(formulas) <= 120:
+        raise ValueError("Unsupported number of cached ranges")
+    stream = BytesIO()
+    with Workbook(stream, {"in_memory": True}) as workbook:
+        sheet = workbook.add_worksheet("Data")
+        column = 0
+        for formula in formulas:
+            reference = formula.getparent()
+            kind = ET.QName(reference).localname
+            caches = {"strRef": "strCache", "numRef": "numCache", "multiLvlStrRef": "multiLvlStrCache"}
+            cache = reference.find(_CHART + caches[kind])
+            if cache is None:
+                raise ValueError("A source range has no cached data")
+            count_part = cache.find(_CHART + "ptCount")
+            count = int(count_part.get("val")) if count_part is not None else 0
+            levels = list(reversed(cache.findall(_CHART + "lvl"))) if kind == "multiLvlStrRef" else [cache]
+            if not 1 <= count <= 1000 or not 1 <= len(levels) <= 8:
+                raise ValueError("Unsupported chart range dimensions")
+            first = xl_rowcol_to_cell(1, column, row_abs=True, col_abs=True)
+            field = ET.QName(reference.getparent()).localname
+            header = {"cat": "Category", "val": "Value", "tx": "Label"}.get(field, field)
+            for level in levels:
+                sheet.write_string(0, column, header)
+                seen = set()
+                for point in level.findall(_CHART + "pt"):
+                    index = int(point.get("idx"))
+                    value = point.findtext(_CHART + "v")
+                    if not 0 <= index < count or index in seen or value is None or len(value) > 32767:
+                        raise ValueError("Invalid cached chart point")
+                    seen.add(index)
+                    if kind == "numRef":
+                        number = float(value)
+                        if not math.isfinite(number):
+                            raise ValueError("Invalid cached number")
+                        sheet.write_number(index + 1, column, number)
+                    else:
+                        sheet.write_string(index + 1, column, value)
+                column += 1
+            last = xl_rowcol_to_cell(count, column - 1, row_abs=True, col_abs=True)
+            formula.text = "Data!" + (first if first == last else f"{first}:{last}")
+    return stream.getvalue()
+
+
+def _add_cached_chart(target, slide, x, y, w, h):
+    """Copy a single bar/line plot, its axes and labels, using only published cached data."""
+    charts = [shape.chart for shape in slide.shapes if shape.has_chart]
+    if len(charts) != 1:
+        return False
+    space = deepcopy(charts[0]._chartSpace)
+    plots = space.xpath(".//c:plotArea/*[c:ser]")
+    if not plots or any(p.tag not in {_CHART + "barChart", _CHART + "lineChart"} for p in plots):
+        return False
+    # Chart relationships can reference workbooks, custom drawings or images. Never
+    # carry those from the source. Plain cached chart XML describes the entire figure.
+    for part in space.xpath("./c:externalData | .//c:extLst"):
+        part.getparent().remove(part)
+    for option in list(space.iter(_COMPAT + "AlternateContent")):
+        fallback = option.find(_COMPAT + "Fallback")
+        if option.getparent() is not space or fallback is None or len(fallback) != 1 or fallback[0].tag != _CHART + "style":
+            return False
+        option.getparent().replace(option, fallback[0])
+    for part in space.iter():
+        if (not isinstance(part.tag, str) or not part.tag.startswith((_CHART, _DRAW))
+                or part.tag in {_DRAW + "hlinkClick", _DRAW + "hlinkHover", _DRAW + "blip",
+                                _CHART + "pivotSource", _CHART + "userShapes"}
+                or any("relationships" in key for key in part.attrib)):
+            return False
+    for series in space.xpath(".//c:ser"):
+        if not series.xpath("c:cat/*/c:f") or not series.xpath("c:val/c:numRef/c:f"):
+            return False
+    try:
+        data = _chart_workbook(space)
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+    package = target.part.package
+    chart = ChartPart.load(package.next_partname(ChartPart.partname_template), CT.DML_CHART,
+                           package, ET.tostring(space))
+    chart.chart_workbook.update_from_xlsx_blob(data)
+    relation = target.part.relate_to(chart, RT.CHART)
+    target.shapes._add_chart_graphicFrame(relation, *map(Inches, (x, y, w, h)))
+    return True
 
 
 def _draw_table(target, rows):
@@ -217,43 +380,67 @@ def _evidence_deck(paths, records, parsed, topic, output):
         slide = original.slides[number - 1]
         page = parsed[record["deckId"]].slides[number - 1]
         target = deck.slides.add_slide(deck.slide_layouts[5])
-        title = page.title if page.title != f"Slide {number}" else record["deckTitle"]
+        parts = _source_paragraphs(slide)
+        content_title = _excerpt_heading(page, slide, parts, record)
+        title = _specific_heading(content_title, parts, record["evidence"])
+        edition = re.search(r"\(([A-Z][A-Z0-9-]{2,15})\)\s+((?:19|20)\d{2})\s*$", record["deckTitle"], re.I)
+        caption = record["evidence"]
+        if edition and title == content_title and len(title) < 48:
+            edition_text = " ".join(edition.groups())
+            if edition_text.casefold() not in title.casefold():
+                title = f"{title}  ·  {edition_text}"
+        record["displayTitle"] = title
         heading = target.shapes.title
-        heading.left, heading.top, heading.width, heading.height = map(Inches, (.66, .32, 12, 1.28))
+        heading.left, heading.top, heading.width, heading.height = map(Inches, (.7, .23, 11.9, 1.17))
         heading.text = title
         heading.text_frame.word_wrap = True
         for paragraph in heading.text_frame.paragraphs:
+            paragraph.alignment = PP_ALIGN.LEFT
             paragraph.font.name = "Aptos Display"
-            paragraph.font.size = Pt(26 if len(title) > 85 else 32)
+            paragraph.font.size = Pt(25 if len(title) > 85 else 31)
             paragraph.font.bold = True
-        rows = _source_table(slide, record["evidence"])
-        image = _dominant_image(slide, original) if rows is None else None
-        record["excerptImage"] = bool(image)
-        record["excerptTable"] = bool(rows)
+
+        rows = _source_table(slide, caption)
+        has_chart = rows is None and _add_cached_chart(target, slide, .83, 2.62, 11.66, 3.9)
+        picture = _dominant_image(slide, original) if rows is None and not has_chart else None
+        visual = bool(has_chart or picture)
+        record.update(excerptChart=has_chart, excerptImage=bool(picture), excerptTable=bool(rows))
         if rows:
             _draw_table(target, rows)
             body = ""
         elif rows is not None:
             body = "Open the source slide below to read the full table with its column headings and units."
         else:
-            body = _excerpt_text(page, slide, record["evidence"], 410 if image else 650)
-            if image and body == title:
-                body = ""
-        if image:
-            w, h = image.size
-            scale = min(4.7 / w, 3.85 / h)
-            target.shapes.add_picture(BytesIO(image.blob), Inches(7.95 + (4.7 - w * scale) / 2),
-                                      Inches(1.97 + (3.85 - h * scale) / 2), Inches(w * scale), Inches(h * scale))
+            body = _excerpt_text(page, parts, caption, content_title, 300 if visual else 700)
+            if title != content_title and body.startswith(title):
+                body = body[len(title):].strip()
+        if picture:
+            # The original aspect ratio is preserved. A photo without a separate
+            # caption can use the entire content area below the title.
+            y, height = (2.62, 3.9) if body else (1.47, 5.0)
+            width, h = picture.size
+            scale = min(11.65 / width, height / h)
+            w, h = width * scale, h * scale
+            target.shapes.add_picture(BytesIO(picture.blob), Inches(.84 + (11.65 - w) / 2),
+                                      Inches(y + (height - h) / 2), Inches(w), Inches(h))
         if body:
-            shape = _textbox(target, body, .8, 1.84, 6.95 if image else 11.78, 4.4,
-                             18 if len(body) > 340 else 22, "243537")
+            if visual:
+                # One compact caption leaves space for the readable graph.
+                body = body.replace("\n\n", " ")
+            shape = _textbox(target, body, .84, 1.47, 11.66, 1.14 if visual else 4.88,
+                             (15 if len(body) > 196 else 18) if visual else (18 if len(body) > 365 else 23),
+                             "243537")
             for paragraph in shape.text_frame.paragraphs:
                 paragraph.font.color.theme_color = MSO_THEME_COLOR.TEXT_1
         credit = record["publisher"] or record["author"] or record["deckTitle"]
-        label = f"{credit[:105]}   ·   Original slide {number}"
-        footer = _textbox(target, label, .8, 6.68, 11.7, .45, 12, "355C6F")
+        label = f"{credit[:95]}   ·   Original slide {number}"
+        footer = _textbox(target, label, .85, 6.79, 11.6, .38, 11, "355C6F")
         footer.text_frame.paragraphs[0].runs[0].hyperlink.address = record["sourcePage"]
-        target.notes_slide.notes_text_frame.text = page.notes
+        frame = target.notes_slide.notes_text_frame
+        frame.text = page.notes
+        if page.text:
+            frame.add_paragraph().text = "Original slide text"
+            frame.add_paragraph().text = page.text
         _add_source_notes(target, record)
     deck.save(output)
 

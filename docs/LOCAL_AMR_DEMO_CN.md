@@ -4,7 +4,7 @@
 
 ## 1 重启后从这里开始
 
-**第一次解压。** 把交付的 AMR_Local_Demo.zip 放进“下载”。右键选择“全部解压”，目标选“下载”下的 AMR_Local_Demo。保留旧工程及其课件。以下各框每一行都是一条完整的 PowerShell 命令。一行复制一次，按 Enter，等上一条执行结束。
+**第一次解压。** 把交付的 AMR_Local_Demo.zip 放进“下载”。右键选择“全部解压”，目标选“下载”下的 AMR_Local_Demo。先双击解压目录里的 Get-AMR-Code.cmd，等它显示 Ready；它会联网从 GitHub 获取匹配版本的程序，保存到与 UK_Example 相邻的 amr-workbench 文件夹。保留旧工程及其课件。以下各框每一行都是一条完整的 PowerShell 命令。一行复制一次，按 Enter，等上一条执行结束。
 
 ```powershell
 $dl = Join-Path $env:USERPROFILE "Downloads"
@@ -15,7 +15,7 @@ Set-Location $start.DirectoryName
 Test-Path .\scripts\run_local_brief.py
 ```
 
-最后一行应显示 True。没有找到文件时，在资源管理器中搜索 start-amr.cmd，打开它所在的文件夹，在地址栏输入 powershell 并回车。若从 GitHub 获取源码，应下载含此启动文件的版本，将新解压的工程命名为 amr-workbench。系统可能同时存在多个名为 fao-amr-pptx-builder-main 的文件夹，应用启动文件确认版本。
+最后一行应显示 True。没有找到文件时，在资源管理器中搜索 start-amr.cmd，打开它所在的文件夹，在地址栏输入 powershell 并回车。若从 GitHub 获取源码，应下载含此启动文件的版本，将新解压的工程命名为 amr-workbench，放在 UK_Example 文件夹旁边。系统可能同时存在多个名为 fao-amr-pptx-builder-main 的文件夹，应用启动文件确认版本。
 
 **第一次启动英国案例。** 下列启动器会创建虚拟环境并安装项目。保留这个 PowerShell 窗口，在浏览器地址栏打开 http://127.0.0.1:8765 。
 
@@ -45,11 +45,11 @@ UK veterinary antibiotic sales and resistance surveillance
 
 **比较两种设计。** 把 draft.pptx 和 styled.pptx 停在同一页。在模板版中指出母版背景、页边或标题位置的变化，在备注区确认原页码和链接仍相同。若希望每页按统一结构重排，可在生成时勾选“统一编排证据页”，程序会重排可核验的原文；跨源页面不兼容时也会使用这种版式。
 
-**把同一份初稿换成自己的模板。** 在结果区“为这份初稿更换模板”选择一个含母版设计的 .pptx 或 .potx，点击“应用新模板”再点“下载新模板版”。此按钮只使用本次已生成的 draft.pptx，无需重新检索。保留初稿即可重复试用多套模板；重启浏览器会话后，可以用第 5 节的命令为已有文件换版。
+**把同一份初稿换成自己的模板。** 在结果区“为这份初稿更换模板”从随包的 Templates 文件夹选 Briefing_Amber.pptx，或选择自己的 .pptx 或 .potx，点击“应用新模板”再点“下载新模板版”。此按钮只使用本次已生成的 draft.pptx，无需重新检索。保留初稿即可重复试用多套模板；重启浏览器会话后，可以用第 5 节的命令为已有文件换版。
 
-**还没有自己的模板时。** 用 PowerPoint 新建空白演示，打开“视图 → 幻灯片母版”，选左边最上方的大母版，设置浅色背景，并在右边缘加一条彩色竖线。关闭母版视图，另存为“下载”下的 My_AMR_Template.pptx，再按上一步上传。图形放在母版上，普通示例页上的图形不会作为模板装饰导入。文件上限 16 MiB。
+**想现场做自己的模板时。** 用 PowerPoint 新建空白演示，打开“视图 → 幻灯片母版”，选左边最上方的大母版，设置浅色背景，并在右边缘加一条彩色竖线。关闭母版视图，另存为“下载”下的 My_AMR_Template.pptx，再按上一步上传。图形放在母版上，普通示例页上的图形不会作为模板装饰导入。文件上限 16 MiB。
 
-**只看成品时。** 压缩包中的 Example_Outputs 包含预生成的英国案例。首次安装依赖尚未完成，也可以先打开初稿与模板版，在 PowerPoint 中并排查看同一页。
+**只看成品时。** 压缩包中的 Example_Outputs 包含预生成的英国初稿、默认模板版及琥珀色模板版。首次安装依赖尚未完成，也可以先打开初稿与模板版，在 PowerPoint 中并排查看同一页。
 
 **讲解时可以这样说。** “我点开这条来源，能回到原机构发布页，还能在备注找到原始页码。现在我锁定这份十页初稿，更换的是发布样式。请看同一页的设计和出处。”
 
@@ -72,11 +72,12 @@ True 表示找到已校验清单；随后会显示实际课件数并打开原 PP
 .\start-amr.cmd "$old"
 ```
 
-**在新版工程建完整资料库。** 按 Ctrl+C 停止服务，再逐行执行。下载器默认读取项目自带目录，建在新版工程的 .local\amr。下载与原文件核验需要网络。网站日后可能修改或移除文件，实际数量以本机 report.json 为准。
+**在新版工程建完整资料库。** 按 Ctrl+C 停止服务，再逐行执行。显式指定新版的 AMR 专项目录，下载到新工程的 .local\amr。下载与原文件核验需要网络。网站日后可能修改或移除文件，实际数量以本机 report.json 为准。
 
 ```powershell
 $py = ".\.venv\Scripts\python.exe"
-& $py scripts\fetch_public_corpus.py --corpus-dir .local\amr --workers 4
+$cat = "examples\public_corpus\amr\catalog.csv"
+& $py scripts\fetch_public_corpus.py --catalog $cat --corpus-dir .local\amr
 Get-Content .local\amr\report.json -Raw
 .\start-amr.cmd ".local\amr"
 ```
@@ -121,10 +122,10 @@ $runs = Get-ChildItem build\amr-briefs -Directory -Filter "brief-*"
 $r = $runs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 ```
 
-**给已有初稿换模板。** 先按第 2 节把模板保存到“下载”。运行下列命令可在原输出目录另存一份新设计。末行打开目录，里面的 source_map.json 按输出页序记录原文件、原页、网址、作者、证据和校验值。若重复换版，换一个输出名。
+**给已有初稿换模板。** 直接使用随包的琥珀色母版。运行下列命令可在原输出目录另存一份新设计。末行打开目录，里面的 source_map.json 按输出页序记录原文件、原页、网址、作者、证据和校验值。若重复换版，换一个输出名。
 
 ```powershell
-$t = Join-Path $env:USERPROFILE "Downloads\My_AMR_Template.pptx"
+$t = "..\Templates\Briefing_Amber.pptx"
 $draft = Join-Path $r.FullName "draft.pptx"
 $copy = Join-Path $r.FullName "my-template.pptx"
 & $py scripts\run_local_brief.py restyle --draft $draft --template $t --output $copy

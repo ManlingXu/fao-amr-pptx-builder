@@ -159,10 +159,42 @@ def _stage(title, body, concepts):
     return "Context"
 
 
+def _annual_subject(page):
+    # Many chart slides have no authored title. Read the opening text for their
+    # subject, and distinguish population-adjusted sales from absolute tonnage.
+    heading = _normalize(page.get("title", ""))
+    text = _normalize(page.get("body", "")[:700])
+    for passage in (heading, text):
+        if re.search(r"\b(sales?|sold)\b|销售", passage):
+            if re.search(r"mg\s*/\s*(kg|pcu)|per (kg|pcu)|population.adjusted", text):
+                return 0
+            if re.search(r"\btonnes?\b|\btonnage\b|吨", text):
+                return 1
+            return 2
+        if re.search(r"clinical surveillance|diagnostic samples|临床监测", passage):
+            return 4
+        if re.search(r"antibiotic use|antimicrobial use|consumption|消耗量", passage):
+            return 3
+        if re.search(r"resistance|surveillance|耐药性|监测", passage):
+            return 5
+    return 6
+
+
 def order_story(candidates: Sequence[dict]) -> list[dict]:
-    """Keep a single source's authored sequence; interleave multiple sources by purpose."""
+    """Use authored order in one deck, or narrative and reporting order across decks."""
     if len({c["deck_id"] for c in candidates}) <= 1:
         return sorted(candidates, key=lambda c: c["slide_number"])
+    series = {c.get("series") for c in candidates}
+    if len(series) == 1 and all(series):
+        # Publication date can lag the reporting period. A unique year in the
+        # source title identifies the edition; ambiguous or absent years cannot.
+        years = {c["deck_id"]: set(re.findall(r"\b(?:19|20)\d\d\b", c.get("deck_title", "")))
+                 for c in candidates}
+        if all(len(values) == 1 for values in years.values()):
+            editions = {deck: next(iter(values)) for deck, values in years.items()}
+            if len(set(editions.values())) > 1:
+                return sorted(candidates, key=lambda c: (STAGES.index(c["stage"]), _annual_subject(c),
+                                                         editions[c["deck_id"]], c["slide_number"], c["deck_id"]))
     return sorted(candidates, key=lambda c: (STAGES.index(c["stage"]), -c["score"],
                                              c["deck_id"], c["slide_number"]))
 

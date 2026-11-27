@@ -110,6 +110,31 @@ def test_multisection_topic_can_cover_a_policy_audience_and_species(tmp_path):
     assert {r["slide_number"] for r in hits} == {1, 2, 3}
 
 
+def test_annual_series_orders_measures_then_reporting_year_and_source_page():
+    from presentation_search.brief_index import order_story
+
+    def candidate(year, number, title, body, score):
+        return dict(deck_id=str(year), deck_title=f"UK-VARSS {year}", series="UK VARSS",
+                    issued="2024" if year == 2019 else "2023", slide_number=number,
+                    title=title, body=body, stage="Monitoring", score=score)
+
+    rows = [
+        candidate(2021, 17, "Slide 17", "Clinical surveillance of diagnostic samples", 10),
+        candidate(2021, 4, "Antibiotic Sales", "Annual sales in mg/kg", 9),
+        candidate(2019, 8, "Antibiotic Sales", "The total amount sold was 190 tonnes", 8),
+        candidate(2019, 13, "Clinical Surveillance", "Cattle samples", 7),
+        candidate(2019, 6, "Sales of Antibiotics", "Primary measure in mg/kg", 6),
+        candidate(2019, 12, "Clinical Surveillance", "Sheep samples", 5),
+        candidate(2021, 3, "Antibiotic Sales", "The total amount sold was 170 tonnes", 4),
+    ]
+    assert [(row["deck_id"], row["slide_number"]) for row in order_story(rows)] == [
+        ("2019", 6), ("2021", 4), ("2019", 8), ("2021", 3),
+        ("2019", 12), ("2019", 13), ("2021", 17),
+    ]
+    rows[0]["deck_title"] = "UK-VARSS comparative report 2020–2021"
+    assert order_story(rows)[0] is rows[0]  # No assumed reporting year when ambiguous.
+
+
 def test_selects_readable_content_instead_of_repeating_a_generic_title(tmp_path):
     from presentation_search.brief_index import _evidence, Features
 
