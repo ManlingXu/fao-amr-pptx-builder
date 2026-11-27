@@ -14,7 +14,7 @@ from http.client import HTTPException
 from io import StringIO
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qsl, quote, unquote, urljoin, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 if __package__:
@@ -31,6 +31,10 @@ SOURCE_HOSTS = {
     "eu-training": {"www.amrfvtraining.eu", "amrfvtraining.eu"},
     "uk-varss": {"www.gov.uk"},
     "cgiar": {"cgspace.cgiar.org"},
+    "strama": {"strama.se"},
+    "rcgp-target": {"elearning.rcgp.org.uk"},
+    "eu-awareness": {"health.ec.europa.eu"},
+    "ukhsa-ebug": {"www.e-bug.eu"},
 }
 MAX_REQUESTS = 300
 MAX_PAGE_BYTES = 8 * 1024 * 1024
@@ -152,6 +156,9 @@ def file_identity(url: str) -> str:
     # Other publishers can use query values to identify distinct downloads.
     if normalized := presentation_url(url):
         return "https://" + HOST + file_key(normalized)
+    parts = urlsplit(url)
+    if parts.netloc == "health.ec.europa.eu" and parts.path.startswith("/document/download/"):
+        return urlunsplit(parts._replace(query=urlencode(parse_qsl(parts.query, keep_blank_values=True)), fragment=""))
     return url.partition("#")[0]
 
 
@@ -230,10 +237,11 @@ def scan_source(source, listed, stats):
 
     if source == "eu-training":
         links = eu_training_links(fetch(LIBRARY_URL))
-    elif source == "uk-varss":
-        links = publishers.discover_uk_varss(fetch)
     else:
-        links = publishers.discover_cgiar(fetch)
+        discover = {"uk-varss": publishers.discover_uk_varss, "cgiar": publishers.discover_cgiar,
+                    "rcgp-target": publishers.discover_rcgp, "strama": publishers.discover_strama,
+                    "eu-awareness": publishers.discover_commission, "ukhsa-ebug": publishers.discover_ebug}
+        links = discover[source](fetch)
     return label_rows(links, listed)
 
 

@@ -1,18 +1,19 @@
-# 150 份 AMR 课件的来源
+# 184 份 AMR 课件的来源
 
-2026 年 11 月 24 日核验的 AMR 专题库共有 **150 份 PowerPoint、3,868 页，来自 30 个来源网站**。下表按每份课件公开来源页（`source_page`）的完整主机名统计，每份文件只算一次。逐份标题、作者、所属领域、主题证据页和下载地址见[完整目录](catalog.csv)。
+截至 2026 年 11 月 27 日，AMR 专题目录收录 **184 份已核验过的 PowerPoint、4,708 页，来自 31 个来源网站**。当日全库下载可验证 183 份、4,697 页。英国 BSAC 的 11 页病例课件当时返回 HTML，因此未进入本次本地索引。下表按每份课件公开来源页（`source_page`）的完整主机名统计，每份文件只算一次。逐份标题、作者、所属领域、主题证据页和下载地址见[完整目录](catalog.csv)。
 
 | 来源网站 | 课件数 | 页数 | 发布机构、项目及课件内容 | 来源示例 |
 |---|---:|---:|---|---|
-| `www.amrfvtraining.eu` | 32 | 619 | 欧盟农户与兽医 AMR 培训项目。农场案例、用药与监管课程 | [打开](https://www.amrfvtraining.eu/library/) |
+| `www.amrfvtraining.eu` | 57 | 1,240 | 欧盟农户与兽医 AMR 培训项目。农场案例、用药与监管课程 | [打开](https://www.amrfvtraining.eu/library/) |
 | `elearning.rcgp.org.uk` | 22 | 665 | 英国皇家全科医师学会（RCGP）TARGET 工具包。基层合理处方、审计及与患者沟通 | [打开](https://elearning.rcgp.org.uk/mod/book/tool/print/index.php?id=12650) |
 | `cgspace.cgiar.org` | 16 | 287 | CGSpace 收录。发布机构字段为国际畜牧研究所（ILRI）的有 15 份，CGIAR System Organization 有 1 份 | [打开](https://cgspace.cgiar.org/items/f8b9bbe5-22ec-4a2d-90e6-2599f1fdb0c5) |
+| `strama.se` | 15 | 319 | 瑞典 Strama 抗菌药物耐药性战略项目。合理用药、处方指标和地区监测 | [打开](https://strama.se/kurser-och-moten/genomforda-kurser-moten/) |
 | `drive.google.com` | 12 | 338 | CwPAMS 合作方课件，Google Drive 托管。内容包括赞比亚兽医培训，以及加纳和乌干达的用药管理 | [打开](https://drive.google.com/file/d/1sUqmUiCrPjQj25qvbXXYgsQTPYus3NIr/view) |
-| `strama.se` | 10 | 218 | 瑞典 Strama 抗菌药物耐药性战略项目。合理用药、处方指标和地区监测 | [打开](https://strama.se/kurser-och-moten/genomforda-kurser-moten/) |
 | `www.med.upenn.edu` | 9 | 314 | 宾夕法尼亚大学网站收录 Pennsylvania Get Smart 活动中不同讲者的课件，涵盖医院、门诊及畜牧业 | [打开](https://www.med.upenn.edu/antibiotics/publications.html) |
 | `www.gov.uk` | 7 | 150 | 英国兽药管理局（VMD）。UK-VARSS 兽用抗菌药物耐药与销售监测，报告年 2019–2025 | [打开](https://www.gov.uk/government/collections/veterinary-antimicrobial-resistance-and-sales-surveillance) |
 | `qid.wisc.edu` | 6 | 103 | 威斯康星大学麦迪逊分校护理机构感染预防项目。尿路感染管理与处方质量改进 | [打开](https://qid.wisc.edu/winipp/uti-toolkit/quality-improvement.php) |
 | `www.cabi.org` | 5 | 87 | CABI 出版的护理人员抗微生物药物管理教材配套课件 | [打开](https://www.cabi.org/products-and-services/about-cabi-books/open-resources/antimicrobial-stewardship-for-nursing-practice/) |
+| `www.e-bug.eu` | 4 | 118 | 英国卫生安全局 e-Bug 学校教育项目。针对不同学段的抗生素使用、耐药、疫苗与课堂讨论 | [打开](https://www.e-bug.eu/ks3-antimicrobial-resistance) |
 | `zenodo.org` | 4 | 91 | 作者将各自作品存入 Zenodo，包括兽医职业、处方决策、AMR 伦理与公众宣传 | [打开](https://zenodo.org/records/7546547) |
 | `www.global-pps.com` | 3 | 72 | Global-PPS 项目。覆盖抗微生物药物使用调查，以及柬埔寨和印度的医院案例 | [打开](https://www.global-pps.com/congress-materials/) |
 | `antibioticwise.ca` | 2 | 83 | 加拿大不列颠哥伦比亚疾病控制中心 Antibiotic Wise 项目。学校和公众教育 | [打开](https://antibioticwise.ca/secondary-school-lessons-and-activities/) |
@@ -34,14 +35,14 @@
 | `www.oregon.gov` | 1 | 41 | 美国俄勒冈州卫生局。学校抗生素耐药性教学模块 | [打开](https://www.oregon.gov/oha/ph/DiseasesConditions/CommunicableDisease/AntibioticResistance/Pages/EducatorsII.aspx) |
 | `www.preventioninfection.fr` | 1 | 18 | 法国 PROMISE 网络与 RéPias。跨部门 One Health 抗耐药合作 | [打开](https://www.preventioninfection.fr/2026-03-31_webinaire-oh-festival_def/) |
 | `www.reactgroup.org` | 1 | 25 | ReAct 全球抗生素耐药行动网络。面向公众的抗生素与耐药知识 | [打开](https://www.reactgroup.org/toolbox/) |
-| **合计** | **150** | **3,868** | | |
+| **合计** | **184** | **4,708** | | |
 
 ## 怎样读这些数字
 
 - **主机名告诉你去哪里找到课件。** 例如，Google Drive 上的 12 份来自英联邦药师协会汇集的 CwPAMS 合作方；赞比亚兽医课件列出的主讲人是 Martha Sinzala。Zenodo、figshare 和 PubMed Central 也提供托管或存档服务。引用单份课件时，应查看目录中的 `author`、`publisher` 和原始页面。[CwPAMS 工具包](https://commonwealthpharmacy.org/cwpams-toolkit/) · [赞比亚原课件](https://drive.google.com/file/d/1sUqmUiCrPjQj25qvbXXYgsQTPYus3NIr/view)
 
-- **文件数包括有独立内容的年度版本。** 英国 7 份属于同一 UK-VARSS 系列的 7 个报告年。例如，要比较 2023 与 2025 年英国兽用抗菌药销售，可以在目录的同一系列中定位两个年份，再核对所选幻灯片的指标。欧盟培训的 32 份中有 9 份来自同一模块的不同国家监管课程。[UK-VARSS 系列](https://www.gov.uk/government/collections/veterinary-antimicrobial-resistance-and-sales-surveillance) · [欧盟培训资料](https://www.amrfvtraining.eu/library/)
+- **文件数包括有独立内容的年度版本。** 英国 7 份属于同一 UK-VARSS 系列的 7 个报告年。例如，要比较 2023 与 2025 年英国兽用抗菌药销售，可以在目录的同一系列中定位两个年份，再核对所选幻灯片的指标。欧盟课程常复用介绍页，例如 16 份销售课件分别有对应国家的 2018、2022 销售数字；后增 7 份监管课件各有自己的国家规则或指南。课件总页数包括这些共用页。[UK-VARSS 系列](https://www.gov.uk/government/collections/veterinary-antimicrobial-resistance-and-sales-surveillance) · [欧盟培训资料](https://www.amrfvtraining.eu/library/)
 
-- **与旧演示库的重合按文件内容核对。** 将两份目录的 SHA-256 比对，18 份相同，具体为 CGSpace 11 份、英国兽药管理局 7 份。因此本专题库相对旧的 120 份综合课件新增了 **132 份不同文件**。[旧目录](../catalog.csv) · [AMR 专题目录](catalog.csv)
+- **与旧演示库的重合按文件内容核对。** 将两份目录的 SHA-256 比对，18 份相同，具体为 CGSpace 11 份、英国兽药管理局 7 份。因此本专题库相对旧的 120 份综合课件新增了 **166 份不同文件**。[旧目录](../catalog.csv) · [AMR 专题目录](catalog.csv)
 
-- **来源清单与爬虫覆盖范围是两个数字。** 表中 30 个网站描述已核验课件的来路。爬虫目前能重复扫描哪些网站、发现多少待审核链接，以[专题演示说明](README.md)和实际运行报告为准。新发现的候选链接经复核入库后，才计入上表。
+- **来源清单与爬虫覆盖范围是两个数字。** 表中 31 个网站描述已核验课件的来路。爬虫目前能重复扫描哪些网站、发现多少待审核链接，以[专题演示说明](README.md)和实际运行报告为准。新发现的候选链接经复核入库后，才计入上表。

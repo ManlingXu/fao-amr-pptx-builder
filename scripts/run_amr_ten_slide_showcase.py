@@ -426,6 +426,14 @@ def _publish_showcase(stage: Path, output: Path) -> None:
     if not output.exists():
         os.replace(stage, output)
         return
+    generated = set(OUTPUTS.values()) | {
+        "Template_Blue.pptx", "Template_Green.pptx", "storyline.json", "source_map.json",
+        "slide_analysis.json", "layout_decisions.json", "layout_report_blue.json",
+        "layout_report_green.json", "summary.json",
+    }
+    if any(entry.name not in generated or entry.is_symlink() or not entry.is_file()
+           for entry in output.iterdir()):
+        raise ValueError("Choose a new output directory to preserve the other files here.")
     backup = output.parent / f".{output.name}.backup-{secrets.token_hex(8)}"
     os.replace(output, backup)
     try:

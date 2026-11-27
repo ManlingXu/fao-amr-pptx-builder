@@ -1,9 +1,11 @@
-"""Discover publication-linked PPTX candidates from official UK and CGIAR metadata."""
+"""Discover native slide attachments from curated public stewardship publishers."""
 from __future__ import annotations
 
 import json
 import re
-from urllib.parse import unquote, urlencode, urlsplit
+from html import unescape
+from html.parser import HTMLParser
+from urllib.parse import parse_qs, unquote, urlencode, urldefrag, urljoin, urlsplit
 from uuid import UUID
 
 GOV = "https://www.gov.uk"
@@ -17,6 +19,19 @@ CG_QUERY = (
 )
 CG_PAGE_SIZE = 60
 MAX_PAGES = 4
+PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+RCGP_BOOKS = tuple(
+    f"https://elearning.rcgp.org.uk/mod/book/tool/print/index.php?id={book}"
+    for book in (12649, 12650, 12651)
+)
+COMMISSION_RESOURCES = (
+    "https://health.ec.europa.eu/home-antimicrobial-resistance-campaign/"
+    "resources-antimicrobial-resistance-campaign_en"
+)
+EBUG_LESSONS = tuple("https://www.e-bug.eu/" + lesson for lesson in (
+    "ks2-antibiotics", "ks3-antimicrobial-resistance", "ks3-phse-preventing-infections-vaccination",
+    "ks4-phse-preventing-infections-vaccination",
+))
 # Limit discovery to livestock, food-system and cross-sector policy/education records.
 CG_SUBJECTS = re.compile(
     r"livestock|farmers?|animal sector|veterinar|agricultur|aquacultur|one health|"
@@ -170,3 +185,100 @@ def discover_cgiar(fetch):
         for row in _attachment_rows(fetch, item):
             rows.setdefault(row["download_url"], row)
     return list(rows.values())
+
+
+class _AttachmentLinks(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+        self.href = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            fields = dict(attrs)
+            self.href = fields.get("href")
+            self.label = fields.get("data-untranslated-label") or ""
+            self.text = []
+
+    def handle_data(self, data):
+        if self.href:
+            self.text.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "a" and self.href:
+            self.links.append((self.href, " ".join((self.label or " ".join(self.text)).split())))
+            self.href = None
+
+
+def _official_attachment_pages(fetch, pages, path_prefix, section, country, *, filename_query=False, static_cdn=None):
+    rows = {}
+    for page in pages:
+        parser = _AttachmentLinks()
+        parser.feed(fetch(page))
+        parser.close()
+        for href, title in parser.links:
+            url = urldefrag(urljoin(page, href)).url
+            parts = urlsplit(url)
+            if (parts.scheme != "https" or parts.netloc != (static_cdn or urlsplit(page).netloc)
+                    or not parts.path.startswith(path_prefix)):
+                continue
+            filename = parse_qs(parts.query).get("filename", [""])[0] if filename_query else unquote(parts.path)
+            if not filename.casefold().endswith(".pptx"):
+                continue
+            if static_cdn:
+                # e-Bug's public native files resolve by path; page links also carry expiring signatures.
+                url = parts._replace(query="").geturl()
+                title = re.sub(r"^(?:Download PPT\b[:\s]*)+", "", title, flags=re.IGNORECASE)
+            rows.setdefault(url, {
+                "title": title or filename.rsplit("/", 1)[-1], "source_page": page, "download_url": url,
+                "country": country, "section": section,
+            })
+    if not rows:
+        raise ValueError(f"No native PPTX attachments found in {section}; inspect the publisher page.")
+    return list(rows.values())
+
+
+def discover_rcgp(fetch):
+    return _official_attachment_pages(fetch, RCGP_BOOKS, "/pluginfile.php/", "RCGP TARGET antibiotic toolkit",
+                                      "United Kingdom")
+
+
+def discover_commission(fetch):
+    return _official_attachment_pages(fetch, [COMMISSION_RESOURCES], "/document/download/",
+                                      "European Commission AMR awareness campaign", "", filename_query=True)
+
+
+def discover_ebug(fetch):
+    return _official_attachment_pages(fetch, EBUG_LESSONS, "/eu-west-2/documents/", "UKHSA e-Bug teaching slides",
+                                      "United Kingdom", static_cdn="cdn.e-bug.eu")
+
+
+def discover_strama(fetch):
+    """Search Sweden's national stewardship programme's public media index for topical native decks."""
+    rows = {}
+    for page in range(MAX_PAGES):
+        query = urlencode({"per_page": 100, "offset": page * 100, "mime_type": PPTX_MIME,
+                           "orderby": "id", "order": "asc", "_fields": "title,post,link,source_url,mime_type"})
+        records = _items(json.loads(fetch("https://strama.se/wp-json/wp/v2/media?" + query)), "Strama files")
+        for record in records:
+            title = _fields(record.get("title"), "Strama title").get("rendered")
+            source = record.get("link")
+            url = record.get("source_url")
+            if not all(isinstance(value, str) for value in (title, source, url)):
+                raise ValueError("Incomplete Strama media record")
+            page_url, file_url = urlsplit(source), urlsplit(url)
+            if (record.get("mime_type") != PPTX_MIME or not title.strip()
+                    or any(p.scheme != "https" or p.netloc != "strama.se" for p in (page_url, file_url))
+                    or not file_url.path.startswith("/wp-content/uploads/")
+                    or not unquote(file_url.path).lower().endswith(".pptx")
+                    or not re.search(r"antibiotika|resistensdata|\bamr\b|app[- ]strama|stewardship",
+                                     title, re.IGNORECASE)):
+                continue
+            # WordPress attachment permalinks often redirect to the raw file. The parent permalink opens the course.
+            post = record.get("post")
+            source_page = f"https://strama.se/?p={post}" if type(post) is int and post > 0 else source
+            rows.setdefault(url, {"title": unescape(title), "source_page": source_page, "download_url": url,
+                                  "country": "Sweden", "section": "Strama stewardship and prescribing"})
+        if len(records) < 100:
+            return list(rows.values())
+    raise ValueError("Strama media index reached the discovery page limit; review before increasing it")
