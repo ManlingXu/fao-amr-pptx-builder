@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo-token" content="{{TOKEN}}">
+<title>AMR 简报工作台</title>
+<style>
+:root{color-scheme:light;--ink:#173a34;--muted:#506c64;--line:#c7d6cc;--paper:#f8faf6;--accent:#15554a;--white:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 "Source Sans 3","Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+.bar{padding:14px max(4vw,22px);background:#153e35;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{font-weight:700;letter-spacing:.05em}.catalog{font-size:.88rem;color:#d2e5d9}
+main{max-width:1320px;padding:24px max(4vw,22px) 56px;margin:auto}h1{font-size:clamp(2.2rem,4.7vw,4.25rem);letter-spacing:-.06em;line-height:1.12;margin:14px 0 18px}
+.intro{font-size:1.04rem;color:var(--muted);margin:0 0 28px}.layout{display:grid;grid-template-columns:minmax(330px, .9fr) minmax(0,1.35fr);border-top:2px solid var(--ink);gap:36px;padding-top:22px}
+h2{font-size:1.36rem;letter-spacing:-.035em;margin:0 0 18px}h3{font-size:1.05rem;margin:0 0 6px}
+fieldset{margin:0 0 16px;padding:0;border:0}label,legend{font-weight:650;font-size:.94rem}
+.form-row{margin-bottom:17px}.form-row>label,.form-row>small{display:block}.form-row small,.hint,.meta{color:var(--muted);font-size:.86rem}
+input[type=text],input[type=number],textarea,select{font:inherit;width:100%;background:var(--white);color:var(--ink);padding:9px 11px;border:1px solid #aabfb1;border-radius:5px;margin-top:5px}
+textarea{min-height:88px;resize:vertical}input:focus,textarea:focus,select:focus,button:focus,a:focus,summary:focus{outline:3px solid #539a85;outline-offset:2px}
+.split{display:grid;grid-template-columns:80px 1fr;align-items:start;gap:24px}.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.chips label{font-weight:500;font-size:.85rem;line-height:1.5;display:flex;align-items:center;gap:5px;border-radius:20px;padding:6px 10px;border:1px solid var(--line);background:white;cursor:pointer}
+.chips input{accent-color:var(--accent);margin:0}.chips label:has(:checked){background:#d6e9d9;border-color:#84af95}
+details{padding:10px 0 8px;border-top:1px solid var(--line)}summary{cursor:pointer;color:var(--accent);font-weight:650;font-size:.94rem}details .form-row{margin:12px 0}
+input[type=file]{font:inherit;font-size:.85rem;display:block;margin-top:7px;max-width:100%}input::file-selector-button{font:inherit;background:white;color:var(--ink);padding:6px 9px;border:1px solid var(--line);border-radius:4px;margin-right:8px;cursor:pointer}
+button,.button{font:inherit;cursor:pointer;border-radius:5px;padding:9px 14px;font-weight:600;background:white;border:1px solid var(--line);color:var(--accent);text-decoration:none;display:inline-block}
+button:hover,.button:hover{background:#e8f1e7}button:disabled{cursor:wait;opacity:.6}.primary{background:var(--accent);color:white;border-color:var(--accent)}.primary:hover{background:#0b4339}
+.generate{display:block;width:100%;margin-top:10px}.empty{padding:22px 24px;background:#e7efe6;border-left:4px solid #60947c}.empty p{margin:0 0 12px}
+.example{display:block;text-align:left;margin:7px 0;padding:7px 10px;font-size:.9rem;font-weight:500;background:#f9fbf7}
+.state{color:var(--muted);margin:10px 0;font-size:.9rem}.error{color:#8f341e}
+.actions{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 16px}.actions a{font-size:.88rem}
+.notice{padding:9px 12px;border-left:3px solid #be863a;background:#f8efdb;color:#654619;font-size:.93rem}
+.rows{list-style:none;counter-reset:item;padding:0;margin:15px 0}.rows li{counter-increment:item;border-top:1px solid var(--line);display:grid;grid-template-columns:33px 1fr;gap:9px;padding:12px 0}
+.rows li::before{content:counter(item, decimal-leading-zero);color:var(--muted);font:600 1.02rem/1.6 Georgia,serif}.rows p{margin:5px 0}
+.rows a{color:var(--accent);font-weight:600}.rows h3,.rows .meta,.rows blockquote{overflow-wrap:anywhere}
+blockquote{border-left:2px solid #91b49e;margin:6px 0 2px;padding:0 0 0 10px;color:#344c43;font-size:.9rem;white-space:pre-line}
+.restyle{background:#ecf2eb;padding:14px;border-radius:5px;margin:12px 0 18px}.restyle button{margin-top:9px;padding:7px 12px;font-size:.9rem}
+[hidden]{display:none!important}@media(max-width:820px){.layout{grid-template-columns:1fr;gap:24px}.empty{padding:18px}.bar{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<header class="bar"><span class="brand">AMR / 知识检索</span><span class="catalog">{{CORPUS}}</span></header>
+<main>
+<h1>AMR 简报工作台</h1>
+<p class="intro">按主题检索已验证的课件，生成可编辑的 PowerPoint，并逐页核对原始出处。</p>
+<div class="layout">
+<section aria-labelledby="plan"><h2 id="plan">演示要求</h2>
+<form id="builder">
+<div class="form-row"><label for="topic">主题</label><textarea id="topic" name="topic" required maxlength="500">赞比亚兽医抗菌药物管理、国家行动计划、养殖户培训和动物监测</textarea></div>
+<div class="split"><div class="form-row"><label for="pages">目标页数</label><input id="pages" name="pages" type="number" min="1" max="20" value="10" required></div>
+<fieldset><legend>领域</legend><div class="chips">
+<label><input type="checkbox" name="sectors" value="animal" checked>动物健康</label>
+<label><input type="checkbox" name="sectors" value="one-health" checked>One Health</label>
+<label><input type="checkbox" name="sectors" value="human">人类健康</label>
+</div></fieldset></div>
+<details><summary>模型与模板</summary>
+<div class="form-row"><label for="model">本地 Ollama 模型</label><input id="model" name="model" type="text" maxlength="120" placeholder="可选，例如 qwen3:4b" autocomplete="off"><small>留空使用本地索引排序。已安装的模型可在 PowerShell 用 ollama list 查看。</small></div>
+<div class="form-row"><label for="design">演示模板</label><input id="design" name="template" type="file" accept=".pptx,.potx"><small>选用自己的 PPTX 或 POTX 母版，或留空使用内置模板。最大 16 MiB。</small></div>
+<div class="form-row"><label><input type="checkbox" name="reflow"> 统一编排证据页</label><small>将原始课件的证据摘录排进统一版式，复杂图表和动画可能省略。</small></div>
+</details>
+<button id="generate" class="primary generate" type="submit">生成 PowerPoint 初稿</button>
+<div id="status" class="state" role="status" aria-live="polite"></div>
+</form></section>
+<section aria-labelledby="results"><h2 id="results">初稿与来源</h2>
+<div id="empty" class="empty"><p><strong>选择演示主题</strong></p><p class="hint">可用下面的主题试跑，也可以直接修改左侧的演示要求。</p>
+<button type="button" class="example" data-sectors="animal,one-health">赞比亚兽医抗菌药物管理、国家行动计划、养殖户培训和动物监测</button>
+<button type="button" class="example" data-sectors="animal">欧洲畜牧业减少抗菌药物使用的措施</button>
+<button type="button" class="example" data-sectors="human">Antibiotic stewardship education and communication in healthcare</button></div>
+<div id="result" hidden><h3 id="resulttopic"></h3><p id="outcome" role="status"></p><div id="downloads" class="actions"></div>
+<form id="restyle" class="restyle" hidden><label for="newtemplate">为这份初稿更换模板</label><input id="newtemplate" type="file" name="template" accept=".pptx,.potx" required>
+<button id="swap" type="submit">应用新模板</button> <span id="swapresult" role="status"></span></form>
+<ol id="sources" class="rows"></ol></div></section>
+</div></main>
+<script nonce="{{TOKEN}}">
+"use strict";
+const byId = id => document.getElementById(id);
+let templateUrl = null;
+const token = document.querySelector('meta[name="demo-token"]').content;
+const node = (tag, value, cls) => {
+  const el = document.createElement(tag);
+  if (value) el.textContent = value;
+  if (cls) el.className = cls;
+  return el;
+};
+function fileLink(url, text, cls) {
+  const anchor = node('a', text, cls || 'button');
+  anchor.href = url; anchor.download = '';
+  return anchor;
+}
+async function send(url, data) {
+  const file = data.get('template');
+  if (file && !file.name) data.delete('template');
+  if (file && file.size > 16 * 1024 * 1024) throw Error('模板大小上限为 16 MiB。');
+  const reply = await fetch(url, {method:'POST', headers:{'X-Demo-Token':token}, body:data});
+  let body;
+  try { body = await reply.json(); } catch { throw Error('本地服务没有返回结果。请查看 PowerShell 的运行记录。'); }
+  if (!reply.ok) throw Error(typeof body.detail === 'string' ? body.detail : '请检查主题、页数和模板。');
+  return body;
+}
+function show(record) {
+  byId('empty').hidden = true; byId('result').hidden = false;
+  const partial = record.status !== 'completed';
+  byId('resulttopic').textContent = record.topic;
+  const summary = '目标 ' + record.requested_pages + ' 页，选入 ' + record.selected_pages + ' 页。';
+  byId('outcome').textContent = summary + (partial ? '现有课件对该主题的支持有限。' : '') +
+    (record.model ? ' 模型排序由 ' + record.model + ' 完成。' : '');
+  byId('outcome').className = partial ? 'notice' : '';
+  const downloads = byId('downloads'); downloads.replaceChildren();
+  for (const [key, label] of [['draft','下载初稿'],['styled','下载模板版'],['sources','下载来源清单']]) {
+    if (record.downloads[key]) downloads.append(fileLink(record.downloads[key], label, key === 'draft' ? 'button primary' : 'button'));
+  }
+  templateUrl = record.template_url; byId('restyle').hidden = !templateUrl;
+  byId('restyle').reset(); byId('swapresult').replaceChildren();
+  const rows = byId('sources'); rows.replaceChildren();
+  for (const s of record.selected) {
+    const li = node('li'), entry = node('div');
+    entry.append(node('h3', s.title || s.deck_title));
+    const meta = node('p', [s.deck_title, s.publisher, '原第 ' + s.slide_number + ' 页'].filter(Boolean).join(' · '), 'meta');
+    try {
+      const url = new URL(s.source_url);
+      if (['https:', 'http:'].includes(url.protocol)) {
+        const anchor = node('a','打开来源'); anchor.href=url.href; anchor.target='_blank'; anchor.rel='noopener noreferrer';
+        meta.append('　',anchor);
+      }
+    } catch { /* A record may lack a URL. */ }
+    entry.append(meta);
+    if (s.model_evidence || s.evidence) entry.append(node('blockquote',s.model_evidence || s.evidence));
+    if (s.reason) entry.append(node('p',s.reason,'hint'));
+    li.append(entry); rows.append(li);
+  }
+}
+document.querySelectorAll('.example').forEach(b => b.addEventListener('click', () => {
+  byId('topic').value = b.textContent; byId('topic').focus();
+  const sectors=b.dataset.sectors.split(',');
+  document.querySelectorAll('input[name="sectors"]').forEach(input => {input.checked=sectors.includes(input.value);});
+}));
+byId('builder').addEventListener('submit', async ev => {
+  ev.preventDefault(); const button=byId('generate'), status=byId('status');
+  button.disabled=true; status.className='state'; status.textContent='正在核对索引、选择证据页并生成文件…';
+  try {
+    const record = await send('/briefs', new FormData(ev.target));
+    show(record); status.textContent='';
+  } catch(err) {status.className='state error'; status.textContent=err.message;}
+  finally {button.disabled=false;}
+});
+byId('restyle').addEventListener('submit', async ev => {
+  ev.preventDefault(); const button=byId('swap'), result=byId('swapresult'), target=templateUrl;
+  button.disabled=true; result.textContent='正在应用模板…';
+  try {
+    const {download}=await send(target, new FormData(ev.target));
+    if (target === templateUrl) result.replaceChildren(fileLink(download,'下载新模板版'));
+  } catch(err) {if (target === templateUrl) result.textContent=err.message;}
+  finally {button.disabled=false;}
+});
+</script>
+</body>
+</html>

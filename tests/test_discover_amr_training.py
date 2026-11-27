@@ -104,11 +104,11 @@ def test_partial_scan_preserves_snapshots_and_resumes_only_failed_sources(tmp_pa
     monkeypatch.setattr(discovery, "scan_source", scan_source)
     options = ["--catalog", str(catalog), "--output-dir", str(runs)]
     with pytest.raises(SystemExit):
-        discovery.main([*options, "--source", "all"])
+        discovery.main([*options, "--source", "eu-training", "--source", "uk-varss", "--source", "cgiar"])
     [incomplete] = runs.iterdir()
     report = json.loads((incomplete / "report.json").read_text())
     assert not report["complete"] and not (incomplete / "candidates.csv").exists()
-    assert [report["sources"][s]["status"] for s in discovery.SOURCE_HOSTS] == ["ok", "failed", "empty"]
+    assert [report["sources"][s]["status"] for s in report["requested_sources"]] == ["ok", "failed", "empty"]
     assert "timed out" in report["sources"]["uk-varss"]["error"]
     assert (incomplete / "cgiar.csv").read_text().count("\n") == 1
 
@@ -140,6 +140,13 @@ def test_source_matching_uses_file_identity_and_keeps_distinct_api_queries(tmp_p
     result = discovery.label_rows(candidates, listed)
     assert [(r["status"], r["catalog_id"]) for r in result] == [("listed", "first"), ("candidate_unreviewed", "")]
     assert "https://example.org/collection.zip" not in listed
+
+
+def test_commission_document_reuses_catalog_entry_for_two_encodings_of_a_space():
+    base = "https://health.ec.europa.eu/document/download/123_en?filename="
+    key = discovery.file_identity(base + "AMR+Teaching.pptx")
+    assert discovery.file_identity(base + "AMR%20Teaching.pptx") == key
+    assert discovery.file_identity(base + "AMR%2BTeaching.pptx") != key
 
 
 def test_publisher_redirects_cannot_cross_source_boundaries():

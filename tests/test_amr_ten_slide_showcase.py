@@ -337,3 +337,16 @@ def test_directory_publish_restores_previous_showcase_when_swap_fails(tmp_path, 
     assert (output / "summary.json").read_text(encoding="utf-8") == "old"
     assert (stage / "summary.json").read_text(encoding="utf-8") == "new"
 
+
+def test_showcase_rejects_replacing_a_directory_containing_other_work(tmp_path):
+    module = load_showcase_module()
+    output = tmp_path / "my-presentations"
+    output.mkdir()
+    existing = output / "my-rehearsal-notes.txt"
+    existing.write_text("keep this", encoding="utf-8")
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    with pytest.raises(ValueError, match="new output directory"):
+        module._publish_showcase(stage, output)
+    assert existing.read_text(encoding="utf-8") == "keep this"
+

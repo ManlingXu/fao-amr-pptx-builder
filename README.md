@@ -6,6 +6,14 @@ Find approved existing slides, use a constrained Copilot decision layer to plan 
 
 [中文开始](docs/START_HERE_CN.md) · [Start here](docs/START_HERE_EN.md) · **[V2 Storyline workflow](docs/V2_WORKFLOW_EN.md)** · **[V2 中文流程](docs/V2_WORKFLOW_CN.md)** · [Copilot setup](docs/COPILOT_STUDIO_EN.md) · [CSI handoff](docs/CSI_HANDOFF_EN.md)
 
+## 本地 AMR 演示工作台
+
+下载并解压本仓库，在 Windows 双击 `start-amr.cmd`，打开 <http://127.0.0.1:8765>。输入中文或英文主题、1–20 页和领域，查看逐页证据、下载可编辑初稿，再给同一份初稿换自己的 PPTX 或 POTX 模板。第一次使用需要已核验的课件目录。可以复用旧版下载的 `.local/amr`。
+
+[Windows 操作手册、示例主题与可复制命令](docs/LOCAL_AMR_DEMO_CN.md) · [课件目录及来源分布](examples/public_corpus/amr/SOURCES_CN.md)
+
+选页使用本地逐页索引，检索标题、正文、备注，以及与国家、物种和专题相关的线索。选择 Ollama 时，本机模型从候选页中挑选证据。PowerPoint 备注与 `source_map.json` 记录原文件、页码和发布者链接。统一编排模式可以把证据重新排成简报页。证据不足时，界面显示缺少的页数。每次生成会创建独立的输出文件夹。
+
 ## One workflow
 
 1. **Understand:** Copilot Studio supplies the conversational LLM and collects the request.
@@ -17,13 +25,13 @@ Find approved existing slides, use a constrained Copilot decision layer to plan 
 
 The [V2 plan workflow](docs/V2_WORKFLOW_EN.md) adds four versioned planning tools (Create/Read/Revise/Finalize), with real-user authentication and current-revision checks. The [V3 Copilot setup](docs/COPILOT_STUDIO_EN.md#v3-configure-the-ai-decision-prompts) adds four manual prompt blueprints plus `AnalyzeSlides`, validated per-slide layout overrides and `GetLayoutReport`. Backend processing is implemented; the prompts, connector, chat attachment path and Teams publication still require tenant configuration and validation. Original direct formatting is retained, so this remains constrained template application rather than arbitrary generative redesign.
 
-This version has no new factual-slide generation, PDF/DOCX ingestion, separate chat UI, vector search or additional backend LLM. Local demos use scripted or interactive selections. Copilot conversation requires a connected agent.
+The local workbench supports topic-based drafting with a deterministic index or an installed Ollama model. The Copilot tools described above use separate tenant configuration. Both routes use evidence from source slides.
 
-## Try the 150-deck AMR collection
+## Try the 184-deck AMR collection
 
-Search 3,868 original slides on antimicrobial use, resistance and stewardship. The animal and One Health filters cover 70 presentations. Each entry lists a representative original slide, publisher and pinned download. The local demo supports slide selection, provenance review and editable draft export. The discovery command checks the EU farmer/veterinarian training library, UK annual surveillance releases and CGIAR presentation records. Inspect candidates and compare file hashes before adding a source.
+The catalogue contains 4,708 original slides on antimicrobial use, resistance and stewardship. Animal and One Health together cover 95 presentations. In the November 2026 replay, 183 of 184 files (4,697 slides) downloaded and verified. Each entry lists a representative original slide, publisher and pinned file hash. Discovery checks seven institutional source collections. Candidates require content and provenance review before inclusion. Another 169 distinct, parseable candidate files (3,143 pages) have a [separate pinned download list](examples/public_corpus/amr/candidate-fetch.csv) for content review.
 
-[30 个来源网站与课件数量](examples/public_corpus/amr/SOURCES_CN.md) · [选页逻辑与 AI 的作用](docs/AMR_SELECTION_LOGIC_CN.md) · [AMR 专题演示与下载步骤](examples/public_corpus/amr/README.md) · [Browse the verified AMR catalogue](examples/public_corpus/amr/catalog.csv)
+[31 个来源网站与课件数量](examples/public_corpus/amr/SOURCES_CN.md) · [选页逻辑与 AI 的作用](docs/AMR_SELECTION_LOGIC_CN.md) · [AMR 专题演示与下载步骤](examples/public_corpus/amr/README.md) · [Browse the verified AMR catalogue](examples/public_corpus/amr/catalog.csv)
 
 ### Run the 10-slide template showcase
 

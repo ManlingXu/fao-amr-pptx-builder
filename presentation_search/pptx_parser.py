@@ -27,6 +27,16 @@ def _shape_text(shape) -> list[str]:
                 value = cell.text.strip()
                 if value:
                     values.append(value)
+    if getattr(shape, "has_chart", False):
+        # Read the labels already embedded in the chart. Numeric series in
+        # isolation cannot describe their units or support a factual sentence.
+        chart = shape.chart._chartSpace
+        labels = chart.xpath(
+            ".//c:title//a:t | .//c:title//c:strCache/c:pt/c:v | "
+            ".//c:ser/c:tx//c:v | .//c:ser/c:cat//c:strCache/c:pt/c:v | "
+            ".//c:ser/c:cat//c:strLit/c:pt/c:v | .//c:ser/c:cat//c:lvl/c:pt/c:v"
+        )
+        values.extend(dict.fromkeys(n.text.strip() for n in labels if n.text and n.text.strip()))
     if isinstance(shape, GroupShape):
         for child in shape.shapes:
             values.extend(_shape_text(child))
