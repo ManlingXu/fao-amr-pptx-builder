@@ -131,7 +131,9 @@ def test_annual_series_orders_measures_then_reporting_year_and_source_page():
         ("2019", 6), ("2021", 4), ("2019", 8), ("2021", 3),
         ("2019", 12), ("2019", 13), ("2021", 17),
     ]
-    rows[0]["deck_title"] = "UK-VARSS comparative report 2020–2021"
+    for row in rows:
+        if row["deck_id"] == "2021":
+            row["deck_title"] = "UK-VARSS comparative report 2020–2021"
     assert order_story(rows)[0] is rows[0]  # No assumed reporting year when ambiguous.
 
 

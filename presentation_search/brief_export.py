@@ -161,7 +161,7 @@ def _source_paragraphs(slide):
 
 
 def _dominant_image(slide, deck):
-    """A large, uncropped, unrotated JPEG/PNG on the selected page can accompany its excerpt."""
+    """Find a substantial authored figure, retaining its displayed proportions and crop."""
     images = []
     for shape in slide.shapes:
         if shape._element.tag != P + "pic" or shape.rotation or not shape.height:
@@ -173,11 +173,12 @@ def _dominant_image(slide, deck):
                        2 <= shape.width / shape.height <= 14 and area >= .065)
         if area < .18 and not wide_figure:
             continue
-        if any(abs(v) > .001 for v in (shape.crop_left, shape.crop_right, shape.crop_top, shape.crop_bottom)):
+        crop = (shape.crop_left, shape.crop_right, shape.crop_top, shape.crop_bottom)
+        if any(value < 0 for value in crop) or crop[0] + crop[1] >= 1 or crop[2] + crop[3] >= 1:
             continue
         image = shape.image
         if image.content_type in {"image/jpeg", "image/png"}:
-            images.append((shape.width * shape.height, image))
+            images.append((shape.width * shape.height, shape))
     return max(images, key=lambda item: item[0])[1] if images else None
 
 
@@ -330,7 +331,7 @@ def _add_cached_chart(target, slide, x, y, w, h):
         return False
     # Chart relationships can reference workbooks, custom drawings or images. Never
     # carry those from the source. Plain cached chart XML describes the entire figure.
-    for part in space.xpath("./c:externalData | .//c:extLst"):
+    for part in space.xpath("./c:externalData | .//c:extLst | .//a:extLst"):
         part.getparent().remove(part)
     for option in list(space.iter(_COMPAT + "AlternateContent")):
         fallback = option.find(_COMPAT + "Fallback")
@@ -339,8 +340,8 @@ def _add_cached_chart(target, slide, x, y, w, h):
         option.getparent().replace(option, fallback[0])
     for part in space.iter():
         if (not isinstance(part.tag, str) or not part.tag.startswith((_CHART, _DRAW))
-                or part.tag in {_DRAW + "hlinkClick", _DRAW + "hlinkHover", _DRAW + "blip",
-                                _CHART + "pivotSource", _CHART + "userShapes"}
+                or part.tag.startswith(_DRAW + "hlink")
+                or part.tag in {_DRAW + "blip", _CHART + "pivotSource", _CHART + "userShapes"}
                 or any("relationships" in key for key in part.attrib)):
             return False
     for series in space.xpath(".//c:ser"):
@@ -397,7 +398,7 @@ def _evidence_deck(paths, records, parsed, topic, output):
         for paragraph in heading.text_frame.paragraphs:
             paragraph.alignment = PP_ALIGN.LEFT
             paragraph.font.name = "Aptos Display"
-            paragraph.font.size = Pt(25 if len(title) > 85 else 31)
+            paragraph.font.size = Pt(23 if len(title) > 85 else 31)
             paragraph.font.bold = True
 
         rows = _source_table(slide, caption)
@@ -418,11 +419,13 @@ def _evidence_deck(paths, records, parsed, topic, output):
             # The original aspect ratio is preserved. A photo without a separate
             # caption can use the entire content area below the title.
             y, height = (2.62, 3.9) if body else (1.47, 5.0)
-            width, h = picture.size
+            width, h = picture.width, picture.height
             scale = min(11.65 / width, height / h)
             w, h = width * scale, h * scale
-            target.shapes.add_picture(BytesIO(picture.blob), Inches(.84 + (11.65 - w) / 2),
-                                      Inches(y + (height - h) / 2), Inches(w), Inches(h))
+            copied = target.shapes.add_picture(BytesIO(picture.image.blob), Inches(.84 + (11.65 - w) / 2),
+                                               Inches(y + (height - h) / 2), Inches(w), Inches(h))
+            copied.crop_left, copied.crop_right = picture.crop_left, picture.crop_right
+            copied.crop_top, copied.crop_bottom = picture.crop_top, picture.crop_bottom
         if body:
             if visual:
                 # One compact caption leaves space for the readable graph.

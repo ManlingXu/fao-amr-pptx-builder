@@ -61,4 +61,7 @@ def test_wide_data_strip_keeps_the_source_figure_and_omits_banner():
                                         Inches(9), Inches(9 * height / width))
     picture(1500, 48, 2)
     chosen = picture(1200, 108, 3)
-    assert _dominant_image(slide, deck).blob == chosen.image.blob
+    chosen.crop_top = .08804
+    source = _dominant_image(slide, deck)
+    assert source.image.blob == chosen.image.blob
+    assert source.crop_top == chosen.crop_top
