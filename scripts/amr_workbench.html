@@ -38,7 +38,7 @@ blockquote{border-left:2px solid #91b49e;margin:6px 0 2px;padding:0 0 0 10px;col
 </style>
 </head>
 <body>
-<header class="bar"><span class="brand">AMR / 知识检索</span><span class="catalog">{{CORPUS}}</span></header>
+<header class="bar"><span class="brand">AMR / 知识检索</span><a href="/" style="color:white">返回对话</a><span class="catalog">{{CORPUS}}</span></header>
 <main>
 <h1>AMR 简报工作台</h1>
 <p class="intro">按主题检索已验证的课件，生成可编辑的 PowerPoint，并逐页核对原始出处。</p>
@@ -48,8 +48,8 @@ blockquote{border-left:2px solid #91b49e;margin:6px 0 2px;padding:0 0 0 10px;col
 <div class="form-row"><label for="topic">主题</label><textarea id="topic" name="topic" required maxlength="500">赞比亚兽医抗菌药物管理、国家行动计划、养殖户培训和动物监测</textarea></div>
 <div class="split"><div class="form-row"><label for="pages">目标页数</label><input id="pages" name="pages" type="number" min="1" max="20" value="10" required></div>
 <fieldset><legend>领域</legend><div class="chips">
-<label><input type="checkbox" name="sectors" value="animal" checked>动物健康</label>
-<label><input type="checkbox" name="sectors" value="one-health" checked>One Health</label>
+<label><input type="checkbox" name="sectors" value="animal">动物健康</label>
+<label><input type="checkbox" name="sectors" value="one-health">One Health</label>
 <label><input type="checkbox" name="sectors" value="human">人类健康</label>
 </div></fieldset></div>
 <details><summary>模型与模板</summary>

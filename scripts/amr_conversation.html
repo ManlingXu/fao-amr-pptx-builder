@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="demo-token" content="{{TOKEN}}">
+<title>AMR 简报助手</title>
+<style>
+:root{color-scheme:light;--ink:#173e37;--dim:#4d655f;--green:#0c5548;--line:#cad7cf;--bg:#f3f6f1;--white:#fff;--pale:#e4efe6;--accent:#ace4c2;--warn:#843518}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Source Sans 3","Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+button,input,textarea{font:inherit} button,.action{cursor:pointer;border:1px solid var(--line);border-radius:7px;background:white;color:var(--green);padding:7px 13px;font-weight:620;text-decoration:none}
+button:hover,.action:hover{background:#e9f2eb}button:disabled{opacity:.5;cursor:default} :focus-visible{outline:3px solid #4c9576;outline-offset:3px}
+.header{background:#143e35;color:white;display:flex;justify-content:space-between;align-items:center;gap:18px;padding:11px clamp(16px,4vw,56px)}
+.brand{font-weight:680;font-size:1.12rem;display:flex;align-items:center;gap:12px;white-space:nowrap}.wordmark{color:var(--accent);font:bold 1.2rem "Source Sans 3",Arial,sans-serif;letter-spacing:.08em;border-right:1px solid #96b4a7;padding-right:12px}
+nav{display:flex;align-items:center;gap:17px}nav a{color:#e2efe8;font-size:.88rem}nav button{border-color:#769b87;background:transparent;color:white;padding:3px 11px;font-size:.87rem}nav button:hover{background:#2d6150}
+main{max-width:1550px;margin:0 auto;padding:20px clamp(14px,3vw,46px) 18px}
+.scope-band{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:15px}
+.scope-band summary{color:var(--green);font-size:.92rem;font-weight:650;cursor:pointer}.scope-band details[open] summary{margin-bottom:3px}
+.scope-band p{margin:1px 0;color:var(--dim);font-size:.82rem}.scope-band code{overflow-wrap:anywhere}.modes{text-align:right;flex-shrink:0}.modes input{width:175px;border:1px solid var(--line);border-radius:5px;padding:5px 7px}.modes label{display:block}.modes small{color:var(--dim)}
+.columns{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(290px,.85fr);gap:18px;height:calc(100dvh - 138px);min-height:460px;max-height:1100px}
+.card{border:1px solid var(--line);border-radius:12px;background:var(--white);min-width:0;min-height:0;overflow:hidden}
+.chat{display:flex;flex-direction:column}
+.feed{flex:1;min-height:0;overflow:auto;padding:clamp(16px,2vw,28px);scrollbar-gutter:stable}
+.welcome{max-width:625px;margin:clamp(14px,4vh,54px) auto 10px}
+h1{font-size:clamp(1.7rem,2.55vw,2.6rem);letter-spacing:-.04em;margin:0 0 8px;line-height:1.2}.welcome p{color:var(--dim);margin:0 0 18px}
+.prompt{display:block;text-align:left;font-weight:550;border-left:3px solid #8ba997;margin-top:8px;padding:8px 12px}
+.turn{margin:0 0 20px;max-width:95%}.turn.user{margin-left:auto;max-width:86%;width:fit-content}.who{font-size:.75rem;letter-spacing:.03em;color:var(--dim);font-weight:680;margin:0 0 3px}.user .who{text-align:right}
+.bubble{white-space:pre-wrap;overflow-wrap:anywhere;color:#223f36}.user .bubble{background:var(--pale);border-radius:12px 3px 12px 12px;padding:8px 13px}.assistant .bubble{padding:2px 0}.turn.error .bubble,.status.error{color:var(--warn)}
+.links{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.links a{font-size:.88rem}.primary,.links .primary{background:var(--green);color:#fff;border-color:var(--green)}.primary:hover{background:#093e36}
+.composer{border-top:1px solid var(--line);padding:10px clamp(12px,1.8vw,24px) 14px}
+.suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}.suggestions button{font-size:.8rem;padding:2px 8px;font-weight:550}
+.compose-line{display:flex;align-items:flex-end;gap:10px;border:1px solid #adbfaf;background:#fbfcfa;padding:7px;border-radius:10px}
+.compose-line textarea{flex:1;min-width:0;width:100%;color:var(--ink);background:transparent;border:0;border-radius:5px;resize:vertical;min-height:43px;max-height:122px;padding:2px 5px;line-height:1.45}.compose-line textarea:focus-visible{outline:none}.compose-line:focus-within{outline:2px solid #589780;outline-offset:1px}.compose-line button{padding:6px 13px}
+.status{font-size:.82rem;color:var(--dim);margin:0 0 4px}.panel{display:flex;flex-direction:column}.panelHead{padding:17px 18px 12px;border-bottom:1px solid var(--line)}
+h2{font-size:1.16rem;margin:0;color:var(--ink)}.panelHead p{font-size:.84rem;color:var(--dim);margin:3px 0 0}
+#outline{margin:0;padding:0;list-style:none;overflow:auto}.source-row{border-bottom:1px solid #e2e9e2}.source-row summary{display:flex;align-items:baseline;gap:8px;padding:10px 17px;cursor:pointer;list-style:none;font-size:.94rem;line-height:1.4;font-weight:630}.source-row summary:hover{background:#eff5ee}.source-row summary::-webkit-details-marker{display:none}
+.ordinal{font:600 .84rem "IBM Plex Mono",Consolas,monospace;color:#42735b;min-width:2ch}.rowTitle{flex:1;overflow-wrap:anywhere}.arrow{font-weight:400;color:var(--dim)}details[open] .arrow{transform:rotate(180deg)}
+.evidence{padding:0 18px 13px 43px;overflow-wrap:anywhere}.evidence p,.evidence blockquote{margin:6px 0;font-size:.83rem;color:var(--dim)}.evidence blockquote{white-space:pre-line;border-left:2px solid #9bb9a6;padding-left:8px;color:#233e35}.evidence a{font-size:.83rem;color:var(--green);font-weight:650}
+#panelEmpty{color:var(--dim);font-size:.9rem;margin:16px 18px}.templateBox{border:1px solid var(--line);border-radius:7px;padding:9px 12px;margin:8px 0 0;background:#f8faf6}
+.templateBox label{display:block;font-weight:600;font-size:.9rem}.templateBox input{max-width:100%;width:100%;margin:6px 0;font-size:.83rem}.templateBox button{font-size:.85rem}
+[hidden]{display:none!important}
+@media(max-height:720px) and (min-width:801px){main{padding-top:10px}.scope-band{margin-bottom:8px}.columns{height:calc(100dvh - 108px);min-height:420px}.welcome{margin-top:6px}.composer{padding-bottom:9px}}
+@media(max-width:800px){main{padding-top:12px}.columns{grid-template-columns:minmax(0,1fr);height:auto;max-height:none;min-height:0;gap:10px}.chat{height:clamp(430px,69dvh,720px)}.panel{max-height:450px}.welcome{margin-top:6px}.header{gap:8px}.brand{gap:6px}.wordmark{padding-right:6px}nav{gap:9px}.scope-band{flex-wrap:wrap;gap:5px}.modes{text-align:left}.feed{padding:14px}.panelHead{padding:10px 15px}}
+</style>
+</head>
+<body>
+<header class="header"><div class="brand"><span class="wordmark" lang="en">AMR</span>简报助手</div><nav aria-label="工作台"><a href="/classic">表单模式</a><button type="button" id="newChat">新对话</button></nav></header>
+<main>
+<div class="scope-band">
+<details id="library"><summary id="scope">{{SCOPE}}</summary><p>{{SCOPE_NOTE}}</p><p>资料目录　<code>{{CORPUS_DIR}}</code></p></details>
+<details class="modes"><summary id="modeCaption">检索模式 · 本地索引</summary><label for="model">可选的本地 Ollama 模型</label><input type="text" id="model" maxlength="120" placeholder="例如 qwen3:4b" autocomplete="off"><p>留空使用索引。开始对话前可指定已安装的模型来重排候选页。</p></details>
+</div>
+<div class="columns">
+<section class="card chat" aria-label="对话">
+<div class="feed" id="feed" role="log" aria-label="消息记录" aria-live="polite">
+<div id="welcome" class="welcome">
+<h1>你想做一份怎样的简报？</h1>
+<p>告诉我主题和页数。我会先检索资料、列出有出处的大纲。你可以追问、换页或调整顺序，确认后再生成 PowerPoint。</p>
+<button type="button" class="prompt" data-message="我想做一份关于赞比亚兽医抗菌药物管理、养殖户培训和动物监测的简报">赞比亚兽医用药、农户培训和监测</button>
+<button type="button" class="prompt" data-message="请做一份10页的简报，主题是英国兽用抗生素销售与耐药监测">英国兽用抗生素销售与耐药监测</button>
+</div>
+</div>
+<form id="compose" class="composer"><div class="suggestions" id="suggestions"></div><p class="status" role="status" id="status" hidden></p>
+<div class="compose-line"><textarea id="message" name="message" maxlength="500" rows="2" aria-label="输入需求或修改意见" placeholder="输入你的主题，或告诉我想怎样修改…" required></textarea><button class="primary" id="send" type="submit">发送</button></div></form>
+</section>
+<aside class="card panel" aria-labelledby="planTitle"><div class="panelHead"><h2 id="planTitle">页序与来源</h2><p id="planMeta">等待你的主题</p></div><p id="panelEmpty">收到需求后，这里会列出每一页的证据、原始页码和出处。</p><ol id="outline"></ol></aside>
+</div>
+</main>
+<script nonce="{{TOKEN}}">
+'use strict';
+const ID = id => document.getElementById(id);
+const token = document.querySelector('meta[name="demo-token"]').content;
+let record = null;
+let busy = false;
+const node = (tag, text, cls) => {
+  const el = document.createElement(tag);
+  if (text != null) el.textContent = text;
+  if (cls) el.className = cls;
+  return el;
+};
+function bottom() { ID('feed').scrollTop = ID('feed').scrollHeight; }
+function turn(role,text) {
+  ID('welcome').hidden = true;
+  const item=node('article',null,'turn '+role);
+  item.append(node('p',role==='user' ? '你' : '简报助手','who'),node('div',text,'bubble'));
+  ID('feed').append(item); bottom();
+  return item;
+}
+function status(text) {
+  ID('status').textContent=text;ID('status').hidden=!text;
+}
+function working(on, title=''){
+  busy=on;
+  for (const id of ['send','newChat','message']) ID(id).disabled=on;
+  ID('model').disabled=on||Boolean(record);
+  for (const b of ID('suggestions').querySelectorAll('button')) b.disabled=on;
+  status(title);
+}
+async function request(url,body,isJSON=false){
+  const headers={'X-Demo-Token':token};
+  if (isJSON) headers['Content-Type']='application/json';
+  const res=await fetch(url,{method:'POST',headers,body:isJSON ? JSON.stringify(body):body});
+  const data=await res.json().catch(()=>({}));
+  if (!res.ok) throw Error(typeof data.detail==='string' ? data.detail : '本地服务未能处理这条消息，请查看启动窗口或重试。');
+  return data;
+}
+function fileLink(url,text,primary=false){
+  const a=node('a',text,primary ? 'action primary':'action');
+  a.href=url;a.download='';return a;
+}
+function renderOutline(data,expand){
+  const list=ID('outline');
+  const openPages=new Set(Array.from(list.querySelectorAll('details[open]')).map(d=>d.dataset.source));
+  list.replaceChildren();
+  const count=data.selected.length, sourceCount=data.source_decks;
+  ID('planMeta').textContent=count ?
+    (data.phase==='exported'?'已导出':'待确认')+' · '+count+' / '+data.requested_pages+' 页 · 引用 '+sourceCount+' 份课件'+(data.index?.decks ? ' · 检索 '+data.index.decks+' 份' : '') :
+    (data.topic||'等待你的主题');
+  ID('panelEmpty').hidden=Boolean(count);
+  if (!count && data.topic) ID('panelEmpty').textContent='继续在对话中补充要求或调整主题。';
+  data.selected.forEach((s,i)=>{
+    const li=node('li',null,'source-row'),details=node('details'),summary=node('summary');
+    details.dataset.source=[s.source_url,s.slide_number,s.deck_title].join('|');
+    details.open=expand===i+1 || (expand===null && openPages.has(details.dataset.source));
+    summary.append(node('span',String(i+1).padStart(2,'0'),'ordinal'),node('span',s.title||s.deck_title,'rowTitle'),node('span','⌄','arrow'));
+    const info=node('div',null,'evidence');
+    const meta=[s.deck_title,s.publisher,'原第 '+s.slide_number+' 页'].filter(Boolean).join(' · ');
+    info.append(node('p',meta));
+    if(s.evidence)info.append(node('blockquote',s.evidence));
+    try{
+      const url=new URL(s.source_url);
+      if(['http:','https:'].includes(url.protocol)){
+        const a=node('a','打开原始来源');a.href=url;a.target='_blank';a.rel='noopener noreferrer';info.append(a);
+      }
+    }catch{}
+    details.append(summary,info);li.append(details);list.append(li);
+    if(expand===i+1) list.scrollTop = Math.max(0, li.offsetTop - list.offsetTop - 25);
+  });
+}
+function quick(label,command,immediate=true){
+  const button=node('button',label);button.type='button';
+  button.addEventListener('click',()=>{ if(busy)return; ID('message').value=command;ID('message').focus();if(immediate)ID('compose').requestSubmit(); });
+  ID('suggestions').append(button);
+}
+function renderActions(){
+  ID('suggestions').replaceChildren();
+  if(!record)return;
+  if(record.phase==='preview' && record.selected.length){
+    quick('查看选页依据','为什么选第1页？');
+    quick('修改第 1 页','把第1页换成',false);
+    quick('确认生成','确认生成');
+  }else if(record.phase==='exported' && record.template_url){quick('更换模板','换模板');}
+}
+function addDownloads(item,links){
+  const div=node('div',null,'links');
+  for(const [name,label] of [['draft','下载初稿'],['styled','下载模板版'],['sources','逐页来源']]){
+    if(links[name])div.append(fileLink(links[name],label,name==='draft'));
+  }
+  if(div.childElementCount)item.append(div);
+}
+function offerTemplate(){
+  const url=record.template_url;
+  const item=turn('assistant','选择一份带幻灯片母版的 PPTX 或 POTX 文件。我会为已确认的这份初稿另存一个模板版。');
+  document.querySelectorAll('.templateBox').forEach(el=>el.remove());
+  const form=node('form',null,'templateBox'), label=node('label','要应用的模板（最大 16 MiB）');
+  const file=node('input');file.type='file';file.id='templateFile';file.accept='.pptx,.potx';file.required=true;label.htmlFor=file.id;
+  const apply=node('button','应用模板');apply.id='applyTemplate';apply.type='submit';
+  form.append(label,file,apply);item.append(form);bottom();
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();if(busy || !file.files.length)return;
+    if(record?.template_url!==url){form.remove();return;}
+    const chosen=file.files[0];if(chosen.size>16*1024*1024){status('模板大小上限为 16 MiB。');return;}
+    working(true,'正在为这份初稿更换模板…');apply.disabled=true;
+    try{
+      const body=new FormData();body.set('template',chosen);
+      const data=await request(url,body);form.remove();
+      const done=turn('assistant','已应用模板「'+chosen.name+'」。页序、证据和来源沿用这份初稿。');
+      const links=node('div',null,'links');links.append(fileLink(data.download,'下载新模板版',true));done.append(links);bottom();
+    }catch(err){turn('assistant error',err.message);apply.disabled=false;}
+    finally{working(false);ID('message').focus();}
+  });
+}
+ID('compose').addEventListener('submit',async e=>{
+  e.preventDefault();const text=ID('message').value.trim();
+  if(!text || busy)return;
+  turn('user',text);ID('message').value='';
+  if(/^(?:请|帮我|请帮我)?(?:换(?:个|一个|一套|新|个新|一个新|一下)?|更换(?:一下|一个|一套)?|切换(?:一下)?|应用(?:新)?)(?:PPT\s*)?(?:模[板版])(?:[。！!.？?])?$/i.test(text) || /^(?:change|apply|switch)(?: the| a| my)? template[.!]?$/i.test(text)){
+    if(record?.template_url)offerTemplate();
+    else turn('assistant','请先确认大纲并生成初稿，再输入「换模板」并选取模板文件。');
+    ID('message').focus();return;
+  }
+  working(true,/确认|导出|生成初稿|confirm|export/i.test(text)&&record?.selected?.length ? '正在处理这份简报…':'正在处理你的消息…');
+  try{
+    const body={message:text};
+    if(record){body.session_id=record.session_id;body.revision=record.revision;}
+    const model=ID('model').value.trim();if(model)body.model=model;
+    const next=await request('/conversation',body,true);
+    if(record?.template_url!==next.template_url)document.querySelectorAll('.templateBox').forEach(el=>el.remove());
+    record=next;
+    const answer=turn('assistant',next.reply);
+    addDownloads(answer,next.downloads||{});
+    const why=/为什么.*?第?\s*(\d+)\s*页|why\s+(?:slide\s*)?(\d+)/i.exec(text);
+    renderOutline(next,why?Number(why[1]||why[2]):null);
+    renderActions();bottom();
+    ID('modeCaption').textContent=next.model ? '候选页重排 · '+next.model : (model ? '已指定本地模型 · '+model : '检索模式 · 本地索引');
+  }catch(err){turn('assistant error',err.message);ID('message').value=text;}
+  finally{working(false);ID('message').focus();}
+});
+ID('message').addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'&&!ev.shiftKey&&!ev.isComposing&&ev.keyCode!==229){ev.preventDefault();ID('compose').requestSubmit();}
+});
+document.querySelectorAll('[data-message]').forEach(button=>button.addEventListener('click',()=>{
+  ID('message').value=button.dataset.message;ID('message').focus();
+}));
+ID('newChat').addEventListener('click',()=>{
+  if(busy)return;
+  record=null;document.querySelectorAll('.turn').forEach(t=>t.remove());
+  ID('welcome').hidden=false;ID('outline').replaceChildren();ID('suggestions').replaceChildren();
+  ID('planMeta').textContent='等待你的主题';ID('panelEmpty').hidden=false;
+  ID('panelEmpty').textContent='收到需求后，这里会列出每一页的证据、原始页码和出处。';
+  ID('message').value='';ID('model').disabled=false;
+  ID('modeCaption').textContent=ID('model').value.trim() ? '已指定本地模型 · '+ID('model').value.trim():'检索模式 · 本地索引';
+  status('');ID('message').focus();
+});
+ID('model').addEventListener('change',()=>{ID('modeCaption').textContent=ID('model').value.trim()?'已指定本地模型 · '+ID('model').value.trim():'检索模式 · 本地索引';});
+</script>
+</body>
+</html>
