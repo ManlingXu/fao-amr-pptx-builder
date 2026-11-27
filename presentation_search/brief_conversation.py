@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field, replace
+from itertools import groupby
 
 from .brief_index import COUNTRIES, Features, build_brief_index
 from .local_brief import save_brief_selection, select_brief_pages
@@ -104,6 +105,16 @@ def _initial_or_revise(state, text, corpus, *, retain_pages=True):
     source_count = len({row["deck_id"] for row in selected})
     reply = (f"我在本地已索引的 {index.stats['decks']} 份课件、{index.stats['slides']:,} 页中检索了“{topic}”。"
              f"草案有 {len(selected)} 页，来自 {source_count} 份原始课件。")
+    if selected:
+        sections = []
+        for stage, group in groupby(enumerate(selected, 1), key=lambda pair: pair[1]["stage"]):
+            positions = [i for i, _ in group]
+            span = str(positions[0]) if len(positions) == 1 else f"{positions[0]}–{positions[-1]}"
+            label = {"Context": "背景", "Policy": "政策", "Implementation": "实践",
+                     "Monitoring": "监测", "Next steps": "后续行动"}.get(stage, stage)
+            sections.append(f"第 {span} 页讲{label}")
+        if len(sections) <= 5:
+            reply += " 提纲安排为" + "、".join(sections) + "。"
     if len(selected) < n:
         reply += f"距离目标还缺 {n-len(selected)} 页。"
     if selected:

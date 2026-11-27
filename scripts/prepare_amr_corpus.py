@@ -66,17 +66,28 @@ def prepare_corpus(catalog, corpus_dir, *, reuse_dirs=(), refresh=False, opener=
 
 
 def default_directory(project=ROOT):
-    """Preserve a previous custom download kept at the standard AMR path."""
-    primary = project / ".local" / "amr"
-    if (primary / "verified.csv").exists():
-        expected = {row["id"]: row["sha256"] for row in read_catalog(CATALOG)}
-        try:
-            rows = read_verified_manifest(primary / "verified.csv")
-            if any(expected.get(row["id"]) != row["sha256"] for row in rows):
-                return project / ".local" / "amr-reviewed"
-        except (OSError, ValueError, TypeError):
-            return project / ".local" / "amr-reviewed"
-    return primary
+    """Use a separate directory if previous work occupies a default location."""
+    base = project / ".local"
+    expected = {row["id"]: row["sha256"] for row in read_catalog(CATALOG)}
+    suffix = 0
+    while True:
+        name = "amr" if not suffix else ("amr-reviewed" if suffix == 1 else f"amr-reviewed-{suffix}")
+        candidate = base / name
+        if not candidate.exists() and not candidate.is_symlink():
+            return candidate
+        if candidate.is_dir() and not candidate.is_symlink():
+            manifest = candidate / "verified.csv"
+            if manifest.is_file():
+                try:
+                    rows = read_verified_manifest(manifest)
+                    if all(expected.get(row["id"]) == row["sha256"] for row in rows):
+                        return candidate
+                except (OSError, ValueError, TypeError):
+                    pass
+            elif not any(candidate.iterdir()) or (candidate / ".cache" / "download.lock").is_file():
+                # A download interrupted before publication may have receipts but no manifest.
+                return candidate
+        suffix += 1
 
 
 def main():
@@ -85,7 +96,11 @@ def main():
     parser.add_argument("--serve", action="store_true", help="Open the local workbench when ready")
     args = parser.parse_args()
     directory = default_directory()
-    old = Path.home() / "Downloads" / "fao-amr-pptx-builder-main" / ".local" / "amr"
+    downloads = Path.home() / "Downloads"
+    reuse = (ROOT / ".local" / "amr", ROOT.parent / "UK_Example",
+             downloads / "fao-amr-pptx-builder-main" / ".local" / "amr",
+             downloads / "AMR_Local_Demo" / "amr-workbench" / ".local" / "amr",
+             downloads / "AMR_Local_Demo" / "UK_Example")
     print(f"Preparing all {len(read_catalog(CATALOG))} approved AMR sources in {directory}", flush=True)
 
     def progress(done, total):
@@ -93,7 +108,7 @@ def main():
             print(f"Checked {done}/{total} sources", flush=True)
 
     try:
-        result = prepare_corpus(CATALOG, directory, reuse_dirs=(ROOT / ".local" / "amr", old),
+        result = prepare_corpus(CATALOG, directory, reuse_dirs=reuse,
                                 refresh=args.refresh, progress=progress)
     except (ValueError, OSError) as exc:
         parser.exit(1, str(exc) + "\n")

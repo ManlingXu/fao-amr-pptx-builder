@@ -5,7 +5,13 @@ import pytest
 def interpret(monkeypatch, message, action, page=0, dest=0, query="", **extra):
     from presentation_search import dialog_model
     rows = [{"title": heading} for heading in ("Introduction", "Guidelines", "Surveillance")]
-    fake = {"action": action, "page": page, "destination": dest, "query": query, **extra}
+    fake = {"action": action, **extra}
+    if page or action in {"remove", "replace", "explain", "pages", "move"}:
+        fake["page"] = page
+    if dest or action == "move":
+        fake["destination"] = dest
+    if query or action in {"topic", "replace"}:
+        fake["query"] = query
     monkeypatch.setattr(dialog_model, "request_local_json", lambda *a, **kw: fake)
     return dialog_model.interpret_message(message, model="qwen3:4b", selected=rows)
 
@@ -41,7 +47,7 @@ def test_conversational_interpretation_changes_only_preview(tmp_path, monkeypatc
     state = Conversation(model="qwen3:4b", topic="Zambia", pages=3, phase="preview", selected=rows)
     out = tmp_path / "out"
     monkeypatch.setattr(dialog_model, "request_local_json", lambda *args, **kwargs: {
-        "action": "move", "page": 3, "destination": 1, "query": "",
+        "action": "move", "page": 3, "destination": 1,
     })
     updated, reply = answer(state, "计划给农业部做汇报，请把最后一张放到最前面", tmp_path, out)
     assert updated.interpretation_model_called and "第 1 页" in reply

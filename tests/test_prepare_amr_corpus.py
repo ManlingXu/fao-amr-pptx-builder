@@ -90,3 +90,13 @@ def test_short_network_transfer_is_retried_once(tmp_path, monkeypatch):
     path = tmp_path / "received"
     _fetch_bytes(path, Request("https://example.org/deck"), opener)
     assert path.read_bytes() == b"complete" and len(calls) == 2
+
+def test_existing_private_materials_are_not_used_as_download_destinations(tmp_path):
+    from scripts.prepare_amr_corpus import default_directory
+    local = tmp_path / ".local"
+    for name in ("amr", "amr-reviewed"):
+        directory = local / name
+        directory.mkdir(parents=True)
+        (directory / "private.pptx").write_bytes(b"keep")
+    assert default_directory(tmp_path) == local / "amr-reviewed-2"
+    assert (local / "amr" / "private.pptx").read_bytes() == b"keep"

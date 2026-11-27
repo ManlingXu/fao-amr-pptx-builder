@@ -26,7 +26,7 @@ h1{font-size:clamp(1.7rem,2.55vw,2.6rem);letter-spacing:-.04em;margin:0 0 8px;li
 .prompt{display:block;text-align:left;font-weight:550;border-left:3px solid #8ba997;margin-top:8px;padding:8px 12px}
 .turn{margin:0 0 20px;max-width:95%}.turn.user{margin-left:auto;max-width:86%;width:fit-content}.who{font-size:.75rem;letter-spacing:.03em;color:var(--dim);font-weight:680;margin:0 0 3px}.user .who{text-align:right}
 .bubble{white-space:pre-wrap;overflow-wrap:anywhere;color:#223f36}.user .bubble{background:var(--pale);border-radius:12px 3px 12px 12px;padding:8px 13px}.assistant .bubble{padding:2px 0}.turn.error .bubble,.status.error{color:var(--warn)}
-.links{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.links a{font-size:.88rem}.primary,.links .primary{background:var(--green);color:#fff;border-color:var(--green)}.primary:hover{background:#093e36}
+.links{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.links a{font-size:.88rem}.links small{align-self:center;color:var(--dim)}.primary,.links .primary{background:var(--green);color:#fff;border-color:var(--green)}.primary:hover{background:#093e36}
 .composer{border-top:1px solid var(--line);padding:10px clamp(12px,1.8vw,24px) 14px}
 .suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}.suggestions button{font-size:.8rem;padding:2px 8px;font-weight:550}
 .compose-line{display:flex;align-items:flex-end;gap:10px;border:1px solid #adbfaf;background:#fbfcfa;padding:7px;border-radius:10px}
@@ -146,6 +146,7 @@ function renderActions(){
   ID('suggestions').replaceChildren();
   if(!record)return;
   if(record.phase==='preview' && record.selected.length){
+    quick('概括大纲','这份PPT会讲什么？');
     quick('查看选页依据','为什么选第1页？');
     quick('修改第 1 页','把第1页换成',false);
     quick('确认生成','确认生成');
@@ -156,7 +157,7 @@ function addDownloads(item,links){
   for(const [name,label] of [['draft','下载初稿'],['styled','下载模板版'],['sources','逐页来源']]){
     if(links[name])div.append(fileLink(links[name],label,name==='draft'));
   }
-  if(div.childElementCount)item.append(div);
+  if(div.childElementCount){div.dataset.current='yes';item.append(div);}
 }
 function offerTemplate(){
   const url=record.template_url;
@@ -175,7 +176,7 @@ function offerTemplate(){
       const body=new FormData();body.set('template',chosen);
       const data=await request(url,body);form.remove();
       const done=turn('assistant','已应用模板「'+chosen.name+'」。页序、证据和来源沿用这份初稿。');
-      const links=node('div',null,'links');links.append(fileLink(data.download,'下载新模板版',true));done.append(links);bottom();
+      const links=node('div',null,'links');links.dataset.current='yes';links.append(fileLink(data.download,'下载新模板版',true));done.append(links);bottom();
     }catch(err){turn('assistant error',err.message);apply.disabled=false;}
     finally{working(false);ID('message').focus();}
   });
@@ -195,10 +196,17 @@ ID('compose').addEventListener('submit',async e=>{
     if(record){body.session_id=record.session_id;body.revision=record.revision;}
     const model=ID('model').value.trim();if(model)body.model=model;
     const next=await request('/conversation',body,true);
-    if(record?.template_url!==next.template_url)document.querySelectorAll('.templateBox').forEach(el=>el.remove());
+    const previous=record;
+    if(previous?.template_url!==next.template_url){
+      document.querySelectorAll('.templateBox').forEach(el=>el.remove());
+      if(previous?.template_url)document.querySelectorAll('.links[data-current]').forEach(el=>{
+        el.prepend(node('small','前一版文件'));delete el.dataset.current;
+      });
+    }
     record=next;
     const answer=turn('assistant',next.reply);
-    addDownloads(answer,next.downloads||{});
+    if(!previous?.template_url || previous.template_url!==next.template_url || /确认|导出|生成|confirm|export/i.test(text))
+      addDownloads(answer,next.downloads||{});
     const why=/为什么.*?第?\s*(\d+)\s*页|why\s+(?:slide\s*)?(\d+)/i.exec(text);
     renderOutline(next,why?Number(why[1]||why[2]):null);
     renderActions();bottom();
