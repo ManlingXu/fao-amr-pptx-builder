@@ -433,6 +433,7 @@ def _evidence_deck(paths, records, parsed, topic, output):
             shape = _textbox(target, body, .84, 1.47, 11.66, 1.14 if visual else 4.88,
                              (15 if len(body) > 196 else 18) if visual else (18 if len(body) > 365 else 23),
                              "243537")
+            shape.text_frame.margin_top = Inches(.09)
             for paragraph in shape.text_frame.paragraphs:
                 paragraph.font.color.theme_color = MSO_THEME_COLOR.TEXT_1
         credit = record["publisher"] or record["author"] or record["deckTitle"]

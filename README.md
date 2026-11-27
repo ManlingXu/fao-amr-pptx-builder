@@ -29,7 +29,7 @@ The local workbench supports topic-based drafting with a deterministic index or 
 
 ## Try the 184-deck AMR collection
 
-The catalogue contains 4,708 original slides on antimicrobial use, resistance and stewardship. Animal and One Health together cover 95 presentations. In the November 2026 replay, 183 of 184 files (4,697 slides) downloaded and verified. Each entry lists a representative original slide, publisher and pinned file hash. Discovery checks seven institutional source collections. Candidates require content and provenance review before inclusion.
+The catalogue contains 4,708 original slides on antimicrobial use, resistance and stewardship. Animal and One Health together cover 95 presentations. In the November 2026 replay, 183 of 184 files (4,697 slides) downloaded and verified. Each entry lists a representative original slide, publisher and pinned file hash. Discovery checks seven institutional source collections. Candidates require content and provenance review before inclusion. Another 169 distinct, parseable candidate files (3,143 pages) have a [separate pinned download list](examples/public_corpus/amr/candidate-fetch.csv) for content review.
 
 [31 个来源网站与课件数量](examples/public_corpus/amr/SOURCES_CN.md) · [选页逻辑与 AI 的作用](docs/AMR_SELECTION_LOGIC_CN.md) · [AMR 专题演示与下载步骤](examples/public_corpus/amr/README.md) · [Browse the verified AMR catalogue](examples/public_corpus/amr/catalog.csv)
 

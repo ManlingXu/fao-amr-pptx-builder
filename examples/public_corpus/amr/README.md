@@ -136,3 +136,14 @@ python scripts/review_amr_candidates.py --candidates .local/amr-training-candida
 ```
 
 复核程序实际下载指定的源文件、核对 PowerPoint 能否解析、统计原始页数，再将 SHA-256 与已收录目录及本批文件比对。实测两个版本各 22 页。英文版与目录原件完全一致，德文版的文件校验值不同；出版方的课程场次和标题显示两者是同一讲义的不同语言版本。`review.json` 保留逐项结论与失败原因。审核人仍需核对内容、翻译或近似版本、原始证据页和复用条款，然后决定是否入库。[下载复核代码](../../../scripts/review_amr_candidates.py)
+
+## 另行下载 169 份待审课件
+
+七个机构入口共找到 300 个下载地址。本次处理全部 182 个未列入目录的地址，175 个能正常下载并打开。按 SHA-256 排除与正式目录相同的 1 个和候选之间重复的 5 个后，得到 169 个不同文件，共 3,143 页。其余 7 个中，6 个超过 64 MiB，1 个经重试仍返回 HTTP 503。
+
+从下列独立目录复核国家版本、译本、正文及署名条件。169 份中有 164 份来自欧盟农户及兽医培训库，多个语言或国家版可共享培训内容。正式检索仍以经过内容审阅的目录为准。
+
+```powershell
+$cat = "examples\public_corpus\amr\candidate-fetch.csv"
+.\.venv\Scripts\python.exe scripts\fetch_public_corpus.py --catalog $cat --corpus-dir .local\amr-candidates --workers 4
+```
