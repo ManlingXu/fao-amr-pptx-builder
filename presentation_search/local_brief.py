@@ -26,22 +26,9 @@ def _check_template(template):
         raise ValueError("The template must contain 1 byte to 16 MiB.")
 
 
-def build_brief(corpus_dir, output_root, *, topic, pages, sectors=(), model=None, template=None, reflow=False):
-    topic = topic.strip()
-    if not 1 <= len(topic) <= 500:
-        raise ValueError("Enter a topic between 1 and 500 characters.")
-    if type(pages) is not int or not 1 <= pages <= 20:
-        raise ValueError("Choose between 1 and 20 slides.")
-    if set(sectors) - {"animal", "one-health", "human"}:
-        raise ValueError("Choose animal, one-health or human.")
-    _check_template(template)
-    corpus = Path(corpus_dir).resolve()
-    root = Path(output_root).resolve()
-    if root.is_relative_to(corpus):
-        raise ValueError("Choose an output directory outside the source corpus.")
-
-    index = build_brief_index(corpus)
-    pool = index.search(topic, min(40, max(12, pages * 2)), sectors=sectors)
+def select_brief_pages(index, topic, pages, *, sectors=(), model=None, excluded=()):
+    pool = index.search(topic, min(40, max(12, pages * 2 + len(excluded))), sectors=sectors)
+    pool = [row for row in pool if row["slide_id"] not in excluded]
     used_model = False
     if model and pool:
         evidence = [{"slide_id": row["slide_id"], "title": row["title"],
@@ -54,8 +41,15 @@ def build_brief(corpus_dir, output_root, *, topic, pages, sectors=(), model=None
         used_model = True
     else:
         chosen = pool[:pages]
-    selected = order_story(chosen)
+    return order_story(chosen), len(pool), used_model
 
+
+def save_brief_selection(corpus, output_root, *, topic, pages, selected, stats, shortlisted,
+                         sectors=(), model=None, used_model=False, template=None, reflow=False):
+    """Publish precisely these reviewed source pages in their displayed order."""
+    root = Path(output_root).resolve()
+    if root.is_relative_to(Path(corpus).resolve()):
+        raise ValueError("Choose an output directory outside the source corpus.")
     root.mkdir(parents=True, exist_ok=True)
     run = root / ("brief-" + uuid4().hex[:16])
     with tempfile.TemporaryDirectory(prefix=".building-", dir=root) as directory:
@@ -65,7 +59,7 @@ def build_brief(corpus_dir, output_root, *, topic, pages, sectors=(), model=None
             "topic": topic, "requested_pages": pages, "selected_pages": len(selected),
             "status": ("completed" if len(selected) == pages else "partial" if selected else "no_evidence"),
             "unfilled_pages": pages - len(selected), "sectors": list(sectors),
-            "index": index.stats, "shortlisted": len(pool), "model_requested": model,
+            "index": stats, "shortlisted": shortlisted, "model_requested": model,
             "llm_called": used_model, "model_used": model if used_model else None,
             "output_directory": str(run),
             "outputs": {key: Path(exports[key]).name for key in ("draft", "styled", "source_map") if key in exports},
@@ -79,6 +73,24 @@ def build_brief(corpus_dir, output_root, *, topic, pages, sectors=(), model=None
         (stage / "summary.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
         stage.rename(run)
     return report
+
+
+def build_brief(corpus_dir, output_root, *, topic, pages, sectors=(), model=None, template=None, reflow=False):
+    topic = topic.strip()
+    if not 1 <= len(topic) <= 500:
+        raise ValueError("Enter a topic between 1 and 500 characters.")
+    if type(pages) is not int or not 1 <= pages <= 20:
+        raise ValueError("Choose between 1 and 20 slides.")
+    if set(sectors) - {"animal", "one-health", "human"}:
+        raise ValueError("Choose animal, one-health or human.")
+    _check_template(template)
+    corpus = Path(corpus_dir).resolve()
+    index = build_brief_index(corpus)
+    selected, shortlisted, used_model = select_brief_pages(index, topic, pages, sectors=sectors, model=model)
+    return save_brief_selection(corpus, output_root, topic=topic, pages=pages, selected=selected,
+                                stats=index.stats, shortlisted=shortlisted, sectors=sectors, model=model,
+                                used_model=used_model, template=template, reflow=reflow)
+
 
 
 def restyle_brief(draft_path, template_path, destination_path):

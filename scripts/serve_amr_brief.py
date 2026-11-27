@@ -2,12 +2,17 @@
 from __future__ import annotations
 
 import argparse
-import csv
+import html
 import re
 import secrets
 import sys
+import webbrowser
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Thread
+from time import monotonic, sleep
+from urllib.error import URLError
+from urllib.request import urlopen
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -17,8 +22,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from presentation_search.templates import MAX_TEMPLATE_BYTES
+from scripts.amr_conversation_routes import register_conversation_routes
+from scripts.prepare_amr_corpus import describe_corpus
 
-HTML = Path(__file__).with_name("amr_workbench.html")
+CHAT = Path(__file__).with_name("amr_conversation.html")
+CLASSIC = Path(__file__).with_name("amr_workbench.html")
 FILES = {"draft": "draft.pptx", "styled": "styled.pptx", "sources": "source_map.json"}
 PUBLIC_FIELDS = ("deck_title", "title", "slide_number", "source_url", "evidence", "model_evidence",
                  "reason", "publisher", "author", "stage")
@@ -43,6 +51,7 @@ def create_demo_app(corpus_dir: Path, output_dir: Path, *, build=None, restyle=N
     corpus_dir, output_dir = Path(corpus_dir).resolve(), Path(output_dir).resolve()
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     token = secrets.token_urlsafe(32)
+    app.state.launch_id = secrets.token_hex(12)
     runs: dict[str, dict[str, Path]] = {}
 
     @app.middleware("http")
@@ -60,6 +69,8 @@ def create_demo_app(corpus_dir: Path, output_dir: Path, *, build=None, restyle=N
             if len(length) > 9 or int(length) > MAX_TEMPLATE_BYTES + 65536:
                 return JSONResponse({"detail": "模板大小上限为 16 MiB。"}, 413)
         response = await call_next(request)
+        if request.url.path == "/":
+            response.headers["X-AMR-Launch"] = app.state.launch_id
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -71,19 +82,36 @@ def create_demo_app(corpus_dir: Path, output_dir: Path, *, build=None, restyle=N
 
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 
+    def render_page(source: Path):
+        coverage = describe_corpus(corpus_dir)
+        verified = coverage["verified_decks"]
+        slides = coverage["verified_slides"]
+        reviewed = coverage["reviewed_decks"]
+        catalog = coverage["catalog_decks"]
+        if not verified:
+            scope = "本地资料库尚未就绪"
+            note = "请用 start-amr.cmd 从正式目录下载并校验课件，然后刷新页面。"
+        elif coverage["full_catalog_attempted"] and coverage["is_reviewed_corpus"]:
+            scope = f"正式目录 {catalog} 份 · 本地核验 {verified} 份 · {slides:,} 页"
+            note = "已尝试下载完整目录。默认跨全部本地已核验课件和所有领域检索，逐页出处见大纲。"
+        elif reviewed == verified and reviewed < catalog:
+            scope = f"当前子集 {reviewed} / {catalog} 份 · {slides:,} 页"
+            note = "当前启动目录只含部分正式课件。双击 start-amr.cmd 可切换到完整正式目录。"
+        else:
+            scope = f"当前资料库 {verified} 份 · {slides:,} 页"
+            note = f"已挂载的课件中有 {reviewed} 份匹配正式目录。默认检索这个目录里的全部已核验课件。"
+        values = {"TOKEN": token, "SCOPE": scope, "SCOPE_NOTE": note, "CORPUS_DIR": str(corpus_dir),
+                  "CORPUS": scope}
+        return re.sub(r"\{\{(TOKEN|SCOPE|SCOPE_NOTE|CORPUS_DIR|CORPUS)\}\}",
+                      lambda m: html.escape(values[m[1]]), source.read_text(encoding="utf-8"))
+
     @app.get("/", response_class=HTMLResponse)
     def workspace():
-        decks = slides = 0
-        try:
-            with (corpus_dir / "verified.csv").open(encoding="utf-8-sig", newline="") as handle:
-                for row in csv.DictReader(handle):
-                    decks += 1
-                    slides += int(row.get("slide_count") or 0)
-        except (OSError, ValueError, UnicodeError):
-            info = "请先下载并验证课件"
-        else:
-            info = f"清单收录 {decks} 份课件 · {slides:,} 页"
-        return HTML.read_text(encoding="utf-8").replace("{{TOKEN}}", token).replace("{{CORPUS}}", info)
+        return render_page(CHAT)
+
+    @app.get("/classic", response_class=HTMLResponse)
+    def classic():
+        return render_page(CLASSIC)
 
     @app.post("/briefs")
     def create_brief(topic: str = Form(..., min_length=1, max_length=500),
@@ -105,6 +133,9 @@ def create_demo_app(corpus_dir: Path, output_dir: Path, *, build=None, restyle=N
                                   template=uploaded, reflow=reflow)
             except (ValueError, OSError, RuntimeError) as error:
                 raise HTTPException(400, str(error)) from error
+        return publish_run({**report, "topic": topic.strip()})
+
+    def publish_run(report):
         run_dir = Path(report["output_directory"]).resolve()
         if not run_dir.is_relative_to(output_dir) or run_dir == output_dir:
             raise RuntimeError("Output directory is outside this session's workspace")
@@ -114,11 +145,13 @@ def create_demo_app(corpus_dir: Path, output_dir: Path, *, build=None, restyle=N
         runs[key] = allowed
         sources = [{field: row.get(field) for field in PUBLIC_FIELDS}
                    for row in report["selected"]]
-        return {"topic": topic.strip(), "status": report["status"], "requested_pages": report["requested_pages"],
+        return {"topic": report["topic"], "status": report["status"], "requested_pages": report["requested_pages"],
                 "selected_pages": report["selected_pages"], "selected": sources,
-                "model": model.strip() if report.get("llm_called") else "",
+                "model": report.get("model_used", "") if report.get("llm_called") else "",
                 "downloads": {name: f"/briefs/{key}/files/{name}" for name in allowed},
                 "template_url": f"/briefs/{key}/template" if "draft" in allowed else None}
+
+    register_conversation_routes(app, corpus_dir, output_dir, publish_run)
 
     @app.post("/briefs/{key}/template")
     def apply_design(key: str, template: UploadFile = File(...)):
@@ -151,6 +184,19 @@ def create_demo_app(corpus_dir: Path, output_dir: Path, *, build=None, restyle=N
     return app
 
 
+def _open_when_ready(port: int, launch_id: str):
+    url = f"http://127.0.0.1:{port}/"
+    deadline = monotonic() + 20
+    while monotonic() < deadline:
+        try:
+            with urlopen(url, timeout=1) as response:
+                if response.status == 200 and response.headers.get("X-AMR-Launch") == launch_id:
+                    webbrowser.open(url)
+                return  # Another process may still own this port.
+        except (URLError, OSError):
+            sleep(.25)
+
+
 def main():
     import uvicorn
 
@@ -158,8 +204,12 @@ def main():
     parser.add_argument("--corpus-dir", type=Path, default=ROOT / ".local" / "amr")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "build" / "amr-briefs")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--open-browser", action="store_true", help="Open the workbench when it is ready.")
     args = parser.parse_args()
-    uvicorn.run(create_demo_app(args.corpus_dir, args.output_dir), host="127.0.0.1",
+    app = create_demo_app(args.corpus_dir, args.output_dir)
+    if args.open_browser:
+        Thread(target=_open_when_ready, args=(args.port, app.state.launch_id), daemon=True).start()
+    uvicorn.run(app, host="127.0.0.1",
                 port=args.port, proxy_headers=False)
 
 

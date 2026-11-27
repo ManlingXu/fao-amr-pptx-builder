@@ -23,18 +23,17 @@ if not errorlevel 1 goto corpus
 if errorlevel 1 goto failed
 
 :corpus
-set "AMR_INPUT=.local\amr"
-if exist "%AMR_INPUT%\verified.csv" goto launch
-if exist "%USERPROFILE%\Downloads\fao-amr-pptx-builder-main\.local\amr\verified.csv" set "AMR_INPUT=%USERPROFILE%\Downloads\fao-amr-pptx-builder-main\.local\amr"
-:launch
-if not "%~1"=="" set "AMR_INPUT=%~1"
-echo Corpus: "%AMR_INPUT%"
-if exist "%AMR_INPUT%\verified.csv" goto serve
-echo To download and verify the source presentations, run this in a second PowerShell window from this project folder:
-echo .\.venv\Scripts\python.exe scripts\fetch_public_corpus.py --catalog examples\public_corpus\amr\catalog.csv --corpus-dir "%AMR_INPUT%"
-:serve
-echo Open http://127.0.0.1:8765 in your browser. Press Ctrl+C here to stop.
-".venv\Scripts\python.exe" scripts\serve_amr_brief.py --corpus-dir "%AMR_INPUT%"
+if "%~1"=="" goto full
+if /i "%~1"=="--refresh" goto refresh
+echo Opening the explicitly selected corpus: "%~1"
+".venv\Scripts\python.exe" scripts\serve_amr_brief.py --corpus-dir "%~1" --open-browser
+goto finished
+:full
+".venv\Scripts\python.exe" scripts\prepare_amr_corpus.py --serve
+goto finished
+:refresh
+".venv\Scripts\python.exe" scripts\prepare_amr_corpus.py --refresh --serve
+:finished
 if not errorlevel 1 exit /b 0
 goto failed
 :python_failed

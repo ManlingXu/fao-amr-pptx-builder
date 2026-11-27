@@ -8,9 +8,9 @@ Find approved existing slides, use a constrained Copilot decision layer to plan 
 
 ## 本地 AMR 演示工作台
 
-下载并解压本仓库，在 Windows 双击 `start-amr.cmd`，打开 <http://127.0.0.1:8765>。输入中文或英文主题、1–20 页和领域，查看逐页证据、下载可编辑初稿，再给同一份初稿换自己的 PPTX 或 POTX 模板。第一次使用需要已核验的课件目录。可以复用旧版下载的 `.local/amr`。
+在 Windows 解压最新版仓库，双击 `start-amr.cmd`。首次启动按 184 份正式目录准备本地资料，复用能通过校验的旧课件，再打开 <http://127.0.0.1:8765>。实际可用数取决于发布方下载情况。新版首页用对话完成选页与导出。输入主题和页数，助手会先给出逐页方案。你可以追问来源或要求调整，确认后下载可编辑初稿，再上传自己的 PPTX 或 POTX 模板。
 
-[Windows 操作手册、示例主题与可复制命令](docs/LOCAL_AMR_DEMO_CN.md) · [课件目录及来源分布](examples/public_corpus/amr/SOURCES_CN.md)
+[全库对话录屏指南与可复制台词](docs/RECORD_LOCAL_DEMO_CN.md) · [历史七份课件练习](docs/LOCAL_AMR_DEMO_CN.md) · [正式目录及来源分布](examples/public_corpus/amr/SOURCES_CN.md)
 
 选页使用本地逐页索引，检索标题、正文、备注，以及与国家、物种和专题相关的线索。选择 Ollama 时，本机模型从候选页中挑选证据。PowerPoint 备注与 `source_map.json` 记录原文件、页码和发布者链接。统一编排模式可以把证据重新排成简报页。证据不足时，界面显示缺少的页数。每次生成会创建独立的输出文件夹。
 

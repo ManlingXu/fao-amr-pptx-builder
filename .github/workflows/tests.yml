@@ -36,3 +36,38 @@ jobs:
         run: python scripts/run_storyline_demo.py --output build/ci-storyline-demo
       - name: Check shell syntax
         run: bash -n start-local.sh deploy-azure.sh deploy/azure-appservice.sh
+
+  windows-launcher:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Prepare test environment and editable source decks
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install -e ".[test]"
+          .\.venv\Scripts\python.exe -c "import pathlib,runpy; runpy.run_path('tests/test_local_brief_workflow.py')['corpus_fixture'](pathlib.Path('build/录屏 test'))"
+      - name: Start local workbench using the Windows launcher
+        shell: pwsh
+        run: |
+          $proc = Start-Process cmd.exe -ArgumentList '/d /c start-amr.cmd "build\录屏 test\corpus"' -PassThru
+          try {
+            $deadline = (Get-Date).AddMinutes(2)
+            do {
+              if ($proc.HasExited) { throw "Launcher exited before the workbench opened." }
+              try { $homePage = Invoke-WebRequest 'http://127.0.0.1:8765/' -TimeoutSec 3 -ErrorAction Stop }
+              catch { Start-Sleep -Seconds 1 }
+            } until ($homePage -or (Get-Date) -gt $deadline)
+            if (!$homePage -or $homePage.Content -notmatch 'demo-token') { throw "Workbench did not start." }
+          }
+          finally {
+            if (!$proc.HasExited) { taskkill /T /F /PID $proc.Id | Out-Null }
+          }

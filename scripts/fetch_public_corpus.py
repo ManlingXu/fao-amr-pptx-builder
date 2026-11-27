@@ -9,9 +9,12 @@ import os
 import re
 import shutil
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from http.client import IncompleteRead
 from pathlib import Path, PureWindowsPath
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
@@ -74,7 +77,47 @@ def digest(path: Path) -> str:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def download_deck(row, opener, cache, temporary):
+def _fetch_bytes(path, request, opener):
+    # Retry short transfers and temporary gateways once before reporting that publisher.
+    for attempt in range(2):
+        try:
+            with opener(request, timeout=30) as response:
+                length = response.headers.get("Content-Length", "")
+                if length.isdigit() and int(length) > MAX_FILE_BYTES:
+                    raise ValueError("A source deck exceeds the 64 MiB limit")
+                write_bounded(path, iter(lambda: response.read(64 * 1024), b""))
+                if length.isdigit() and path.stat().st_size < int(length):
+                    raise IncompleteRead(b"", int(length) - path.stat().st_size)
+            return
+        except HTTPError as exc:
+            if attempt or exc.code not in (502, 503, 504):
+                raise
+        except (IncompleteRead, ConnectionError, TimeoutError, URLError):
+            if attempt:
+                raise
+        time.sleep(1)
+
+
+def _reuse_pinned_file(row, directories, destination):
+    # An older cache is only a source of bytes. Its receipts, titles and counts
+    # must never override the approved catalogue or its published SHA-256.
+    if not row["sha256"]:
+        return False
+    for directory in directories:
+        source = directory / "presentations" / (row["id"] + ".pptx")
+        try:
+            if source.is_symlink() or not source.is_file() or source.stat().st_size > MAX_FILE_BYTES:
+                continue
+            with source.open("rb") as stream:
+                write_bounded(destination, iter(lambda: stream.read(65536), b""))
+            if digest(destination) == row["sha256"]:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def download_deck(row, opener, cache, temporary, reuse_dirs=()):
     url = row["download_url"]
     member = row["zip_member"]
     # Keep the URL-only key for receipts written by older direct-download runs.
@@ -95,28 +138,25 @@ def download_deck(row, opener, cache, temporary):
             pass
 
     path = temporary / (row["id"] + ".download")
-    url = quote(url, safe=":/?#[]@!$&'()*+,;=%~")
-    request = Request(url, headers={"User-Agent": "PPTBuilder-PublicCorpus/1.0"})
-    with opener(request, timeout=30) as response:
-        length = response.headers.get("Content-Length", "")
-        if length.isdigit() and int(length) > MAX_FILE_BYTES:
-            raise ValueError("A source deck exceeds the 64 MiB limit")
-        write_bounded(path, iter(lambda: response.read(64 * 1024), b""))
-    if member:
-        extracted = temporary / (row["id"] + ".member")
-        try:
-            with ZipFile(path) as archive:
-                matches = [info for info in archive.infolist() if info.filename == member]
-                if len(matches) != 1:
-                    raise ValueError("Publisher ZIP must contain exactly one entry named " + repr(member))
-                entry = matches[0]
-                if entry.file_size > MAX_FILE_BYTES:
-                    raise ValueError("The selected PowerPoint exceeds the 64 MiB limit")
-                with archive.open(entry) as stream:
-                    write_bounded(extracted, iter(lambda: stream.read(64 * 1024), b""))
-        finally:
-            path.unlink(missing_ok=True)
-        path = extracted
+    if not _reuse_pinned_file(row, reuse_dirs, path):
+        url = quote(url, safe=":/?#[]@!$&'()*+,;=%~")
+        request = Request(url, headers={"User-Agent": "PPTBuilder-PublicCorpus/1.0"})
+        _fetch_bytes(path, request, opener)
+        if member:
+            extracted = temporary / (row["id"] + ".member")
+            try:
+                with ZipFile(path) as archive:
+                    matches = [info for info in archive.infolist() if info.filename == member]
+                    if len(matches) != 1:
+                        raise ValueError("Publisher ZIP must contain exactly one entry named " + repr(member))
+                    entry = matches[0]
+                    if entry.file_size > MAX_FILE_BYTES:
+                        raise ValueError("The selected PowerPoint exceeds the 64 MiB limit")
+                    with archive.open(entry) as stream:
+                        write_bounded(extracted, iter(lambda: stream.read(64 * 1024), b""))
+            finally:
+                path.unlink(missing_ok=True)
+            path = extracted
     checksum = digest(path)
     if row["sha256"] and row["sha256"] != checksum:
         raise ValueError("Downloaded SHA-256 differs from the catalogue")
@@ -148,12 +188,15 @@ def publisher_lock(cache):
         yield
 
 
-def fetch_catalog(catalog, corpus_dir, *, limit=None, workers=3, opener=urlopen):
+def fetch_catalog(catalog, corpus_dir, *, limit=None, workers=3, opener=urlopen, reuse_dirs=(), progress=None):
     if limit is not None and limit < 1:
         raise ValueError("--limit must be positive")
     if not 1 <= workers <= 12:
         raise ValueError("--workers must be between 1 and 12")
+    catalog_hash = digest(catalog)
     rows = read_catalog(catalog)[:limit]
+    if digest(catalog) != catalog_hash:
+        raise ValueError("Catalogue changed while being read. Please retry.")
     cache = corpus_dir / ".cache"
     presentations = corpus_dir / "presentations"
     for directory in (cache, presentations):
@@ -170,12 +213,14 @@ def fetch_catalog(catalog, corpus_dir, *, limit=None, workers=3, opener=urlopen)
         with ThreadPoolExecutor(max_workers=workers) as executor:
             def attempt(row):
                 try:
-                    return download_deck(row, opener, cache, temporary), None
+                    return download_deck(row, opener, cache, temporary, reuse_dirs), None
                 except Exception as exc:
                     # Public hosts and third-party decks fail independently.
                     return None, f"{type(exc).__name__}: {exc}"
 
-            for row, (result, error) in zip(rows, executor.map(attempt, rows)):
+            for position, (row, (result, error)) in enumerate(zip(rows, executor.map(attempt, rows)), 1):
+                if progress:
+                    progress(position, len(rows))
                 if error is not None:
                     failure = {"id": row["id"], "download_url": row["download_url"], "error": error}
                     if row["zip_member"]:
@@ -197,6 +242,7 @@ def fetch_catalog(catalog, corpus_dir, *, limit=None, workers=3, opener=urlopen)
                 verified.append({**row, "sha256": checksum, "slide_count": count})
 
         report = {
+            "catalog_sha256": catalog_hash,
             "requested": len(rows), "verified": len(verified),
             "slides": sum(item["slide_count"] for item in verified),
             "duplicates": duplicates, "failed": failed,
