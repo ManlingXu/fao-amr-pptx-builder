@@ -318,7 +318,7 @@ class BriefIndex:
             for token in tokens | deck.places | deck.concepts | deck.words:
                 self._postings[token].add(i)
 
-    def search(self, topic: str, limit: int, *, sectors: Sequence[str] = ()) -> list[dict]:
+    def search(self, topic: str, limit: int, *, sectors: Sequence[str] = (), min_year: int | None = None) -> list[dict]:
         if not topic.strip() or limit < 1:
             return []
         q = Features.of(topic)
@@ -332,6 +332,10 @@ class BriefIndex:
         ranked = []
         for i in sorted(candidates):
             page = self.pages[i]
+            if min_year is not None:
+                issued = re.match(r"^(?:19|20)\d{2}", page.get("issued") or "")
+                if not issued or int(issued[0]) < min_year:
+                    continue
             if sectors and page["sector"] not in sectors:
                 continue
             body, title, deck = self._fields[i]

@@ -1,0 +1,22 @@
+{
+  "purpose": "Reference settings for a maker and CSI. Use the actual deployment environment template for the backend.",
+  "backendEnvironmentTemplate": "../../../.env.production.example",
+  "pilot": {
+    "KNOWLEDGE_PROVIDER": "sharepoint",
+    "AUTH_MODE": "entra",
+    "AZURE_TENANT_ID": "<approved tenant ID>",
+    "AZURE_CLIENT_ID": "<Graph application ID>",
+    "ENTRA_AUDIENCE": "<backend API application ID>",
+    "ENTRA_ALLOWED_ROLES": "PresentationAssistant.User",
+    "SHAREPOINT_DRIVE_ID": "<approved input library drive ID>",
+    "SHAREPOINT_FOLDER_ITEM_ID": "<approved input folder item ID>",
+    "SHAREPOINT_OUTPUT_DRIVE_ID": "<approved output library drive ID>",
+    "SHAREPOINT_OUTPUT_FOLDER_ITEM_ID": "<approved draft output folder item ID>"
+  },
+  "secretReference": "Configure AZURE_CLIENT_SECRET using the approved host secret store.",
+  "knowledgeRoles": {
+    "existingSlides": "The slide index maps an authorized deck to candidate slide IDs and positions.",
+    "supplementaryGuidance": "A maker may configure an approved SharePoint knowledge source for narrative guidance. The connector remains the authority for exportable slide IDs.",
+    "delivery": "The backend writes to the configured draft location. Validate the returned webUrl under the pilot recipient identity."
+  }
+}

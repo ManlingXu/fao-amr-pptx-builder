@@ -1,0 +1,93 @@
+{
+  "format": "ppt-builder-maker-handoff/v1",
+  "installableSolution": false,
+  "identity": {
+    "displayName": "PPT Builder",
+    "description": "Find evidence in approved presentations and build a traceable, editable PowerPoint briefing.",
+    "instructions": "../agent-instructions-en.txt"
+  },
+  "model": {
+    "tenantSelection": "Select an available model approved for the Power Platform environment. Test actual retrieval and costs under the pilot licence.",
+    "localImplementation": "../../../presentation_search/studio_model.py",
+    "promptBlueprints": [
+      "../ai-prompts/presentation-brief.json",
+      "../ai-prompts/query-expansion.json",
+      "../ai-prompts/candidate-reranking.json",
+      "../ai-prompts/layout-decision.json"
+    ]
+  },
+  "knowledge": {
+    "backend": "knowledge.example.json",
+    "demoCatalog": "../../../examples/public_corpus/amr/catalog.csv"
+  },
+  "tools": "tool-contracts.json",
+  "skills": [
+    "skills/search/SKILL.md",
+    "skills/author/SKILL.md",
+    "skills/review/SKILL.md",
+    "skills/export/SKILL.md"
+  ],
+  "workflow": {
+    "blueprint": "../flow-design.json",
+    "sequence": [
+      "search",
+      "author",
+      "review",
+      "export"
+    ]
+  },
+  "hooks": [
+    {
+      "when": "Candidate shortlist ready",
+      "action": "Validate each candidate ID, source page and reporting date before using it in a plan."
+    },
+    {
+      "when": "Request changes",
+      "action": "Refresh the plan, revise using expected_revision, and collect new confirmation for the revised selection."
+    },
+    {
+      "when": "Before file generation",
+      "action": "Require explicit confirmation of the exact plan and its current revision."
+    },
+    {
+      "when": "Job complete",
+      "action": "Inspect the source map, output URL, warnings and GetLayoutReport before delivery."
+    }
+  ],
+  "memory": {
+    "conversation": [
+      "planId",
+      "revision",
+      "templateId",
+      "jobId"
+    ],
+    "ownership": "Isolate conversation variables by requester. Reauthorize stored plans and output access in the service."
+  },
+  "evaluation": {
+    "reference": "../../../docs/studio/evaluation.csv",
+    "tenantChecks": [
+      "semantic relevance",
+      "source precision",
+      "stale revision handling",
+      "requester file access",
+      "template fidelity",
+      "Teams delivery"
+    ]
+  },
+  "monitor": {
+    "agent": "Record a test trace and outcome under the approved tenant retention policy.",
+    "backend": "Record request IDs, stage, job status and error category. Verify that test permissions exclude another user’s files."
+  },
+  "channels": {
+    "target": "Microsoft Teams",
+    "pilot": "Publish in Dev/Test, enable the Teams channel and share with an approved test group."
+  },
+  "deployment": {
+    "guide": "../../../docs/studio/MIGRATION.md",
+    "csiRequirements": "../../../docs/studio/CSI_REQUIREMENTS.md",
+    "implementationGaps": [
+      "Connector support for local-only reconstruction, translated notes and multi-version QA downloads requires explicit tenant implementation.",
+      "Use the deployed backend identity and SharePoint grants in the tenant acceptance run."
+    ]
+  }
+}
