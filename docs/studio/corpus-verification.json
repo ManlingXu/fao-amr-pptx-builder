@@ -1,0 +1,45 @@
+{
+  "catalog_sha256": "8e8c234b5689b117529801e3a11b3b209aeec43ef9fdd3e6636566e222d65701",
+  "requested": 184,
+  "verified": 183,
+  "slides": 4697,
+  "duplicates": [],
+  "failed": [
+    {
+      "id": "amr-can-we-sustain-improvement-in-our-uti-pathway-reflections-fr-98d77e11",
+      "download_url": "https://bsac.org.uk/wp-content/uploads/2026/10/sustainability-of-cquin-improvements-1716459347.pptx",
+      "error": "ValueError: Downloaded SHA-256 differs from the catalogue"
+    }
+  ],
+  "archive_members": [
+    {
+      "id": "amr-minimierung-der-landwirtschaftlichen-eintrage-von-tierarznei-897780de",
+      "download_url": "https://www.umweltbundesamt.de/system/files/medien/5747/dokumente/lehrmaterialien_landwirtschaft_2024.zip",
+      "zip_member": "Lehre-LANDWIRTSCHAFT_2024update.pptx"
+    },
+    {
+      "id": "amr-umweltaspekte-von-tierarzneimitteln-in-der-tiermedizinischen-7b8738b2",
+      "download_url": "https://www.umweltbundesamt.de/system/files/medien/5747/dokumente/lehrmaterialien_tiermedizin_2024.zip",
+      "zip_member": "Lehre-TIERMEDIZIN_04082024.pptx"
+    },
+    {
+      "id": "meded-10726-1",
+      "download_url": "https://pmc-oa-opendata.s3.amazonaws.com/PMC6342413.1/mep-14-10726-s001.zip",
+      "zip_member": "A._ASP_Presentation_Slides.pptx"
+    }
+  ],
+  "run_date_utc": "2026-11-28",
+  "index": {
+    "parsed_decks": 183,
+    "indexed_slides": 4697,
+    "parser_errors": 0
+  },
+  "starter": {
+    "source_decks": 6,
+    "summarized_original_pages": 40,
+    "languages": [
+      "en",
+      "zh"
+    ]
+  }
+}

@@ -36,20 +36,28 @@
     policy: /polic|legislat|regulat|政策|法规/i, amr: /\bamr\b|resistan|抗微生物|耐药/i,
     training: /train|learn|培训|学习/i, prevention: /prevent|biosecur|预防|生物安全/i,
   };
+  const territories = 'AW AF AO AI AX AL AD AE AR AM AS AQ TF AG AU AT AZ BI BE BJ BQ BF BD BG BH BS BA BL BY BZ BM BO BR BB BN BT BV BW CF CA CC CH CL CN CI CM CD CG CK CO KM CV CR CU CW CX KY CY CZ DE DJ DM DK DO DZ EC EG ER EH ES EE ET FI FJ FK FR FO FM GA GB GE GG GH GI GN GP GM GW GQ GR GD GL GT GF GU GY HK HM HN HR HT HU ID IM IN IO IE IR IQ IS IL IT JM JE JO JP KZ KE KG KH KI KN KR KW LA LB LR LY LC LI LK LS LT LU LV MO MF MA MC MD MG MV MX MH MK ML MT MM ME MN MP MZ MR MS MQ MU MW MY YT NA NC NE NF NG NI NU NL NO NP NR NZ OM PK PA PN PE PH PW PG PL PR KP PT PY PS PF QA RE RO RU RW SA SD SN SG GS SH SJ SB SL SV SM SO PM RS SS ST SR SK SI SE SZ SX SC SY TC TD TG TH TJ TK TM TL TO TT TN TR TV TW TZ UG UA UM UY US UZ VA VC VE VG VI VN VU WF WS YE ZA ZM ZW'.split(' ');
+  const displayNames = ['en','zh'].map(locale=>new Intl.DisplayNames(locale,{type:'region'}));
+  const countryNames = territories.map(code=>[code,...displayNames.map(d=>d.of(code).toLowerCase())]);
+  const sampleCountries = new Set(['GB','ZM','VN','IT']);
+  function missingCountries(query) {
+    const lower=query.toLowerCase(), words=' '+lower.replace(/[^\p{L}]+/gu,' ')+' ';
+    return countryNames.filter(([code,en,zh])=>!sampleCountries.has(code) &&
+      (words.includes(' '+en+' ') || lower.includes(zh))).map(([,en])=>en);
+  }
   const terms = str => String(str).toLowerCase().match(/[a-z0-9]{3,}/g) || [];
   const stops = new Set('create make please slide slides deck briefing presentation give build about prepare make audience editable speakers for the with and into how what source draft slide make country evidence five three ten two english chinese version using training deck'.split(' '));
   const concepts = str => Object.entries(groups).filter(([,rx])=>rx.test(str)).map(([id])=>id);
   function ranked(query, cfg, rows) {
     const keywords = [...new Set(terms(query).filter(w=>!stops.has(w)))], family = concepts(query);
     const places = family.filter(k=>['zambia','vietnam','uk','italy'].includes(k));
-    const unknownPlace = /\b(?:brazil|australia|canada|japan|kenya|argentina)\b|巴西|澳大利亚|加拿大|日本|肯尼亚|阿根廷/i.test(query);
-    if(unknownPlace && !rows.some(r=>String(query).toLowerCase().includes(String(r.country).toLowerCase()))) return [];
+    if(missingCountries(query).length && !places.length) return [];
     const pool = [];
     for (const row of rows) {
       if (cfg.min_year && !(Number(String(row.issued).slice(0,4)) >= cfg.min_year)) continue;
       const tags = (row.tags || []).join(' ');
       const fields = [row.title,row.title_zh,row.evidence,row.evidence_zh,row.source,tags].join(' ');
-      if (places.some(p=> !groups[p].test(row.country || row.source))) continue;
+      if (places.length && !places.some(p=>groups[p].test(row.country || row.source))) continue;
       const normalized = fields.toLowerCase(), topical = [row.title,row.evidence,tags].join(' ').toLowerCase();
       const common = family.filter(k=>groups[k].test(fields)).length;
       const exact = keywords.reduce((sum,w)=> sum + (topical.includes(w) ? 4 : normalized.includes(w) ? 1 : 0), 0);
@@ -171,6 +179,10 @@
       state.topic=query;state.settings=settings;
       state.slides=slidesFor(query,settings,rows);state.warnings=[];
       const zh=isZh(settings),n=state.slides.length;
+      const absent=missingCountries(query);
+      if(absent.length)state.warnings.push((zh?'公开样本缺少这些国家的资料：':'No country-specific source in the public sample for ')+absent.join(', ')+'.');
+      if(/budget|cost|expenditure|预算|费用|经费/i.test(query)&&!state.slides.some(s=>/budget|cost|expenditure|预算|费用|经费/i.test(s.evidence)))
+        state.warnings.push(zh?'现有证据未说明预算或支出金额。':'The selected evidence does not establish a budget or expenditure amount.');
       if(n<settings.count)state.warnings.push(zh?'当前资料只支持 '+n+' 页。':'The available evidence supports '+n+' of '+settings.count+' requested slides.');
       state.reply= n?(zh?'已为你拟好 '+n+' 页大纲。可以查看原始出处，或继续调整后生成 PowerPoint。':'I found evidence for '+n+' slides. Review the outline and its sources, or refine the brief before generating your PowerPoint.'):(zh?'当前公开样本中没有符合主题和年份的资料。可以尝试兽医审慎用药、家禽养殖或调整年份。':'I found no matching slides in this public sample. Try veterinary stewardship or poultry, or adjust the source year.');
       if(msg)addMessage('user',msg);addMessage('assistant',state.reply);save();return snapshot(rows);

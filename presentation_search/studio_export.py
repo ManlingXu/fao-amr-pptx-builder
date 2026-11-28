@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from collections import Counter
 from datetime import datetime, timezone
@@ -10,9 +11,11 @@ from pathlib import Path
 from uuid import uuid4
 
 from pptx import Presentation
+from pptx.dml.color import RGBColor
+from pptx.util import Inches, Pt
 
 from .assembly import P, assemble_slides
-from .brief_export import _add_source_notes, _demo_template, _evidence_deck, _verify
+from .brief_export import _add_source_notes, _demo_template, _evidence_deck, _textbox, _verify
 from .layout_validation import validate_layout
 from .local_brief import _check_template
 from .templating import apply_template
@@ -50,6 +53,41 @@ def _fit_rebuilt(path, canvas):
     deck.save(path)
 
 
+def _format_digests(path, indices, slides, records):
+    """Lay out the author's concise bilingual source digests as editable teaching slides."""
+    deck = Presentation(path)
+    for page, idx in zip(deck.slides, indices, strict=True):
+        card, record = slides[idx], records[idx]
+        if not card["digest"]:
+            continue
+        zh = card["display_language"] == "zh"
+        page.background.fill.solid()
+        page.background.fill.fore_color.rgb = RGBColor.from_string("F8F8F3")
+        title = page.shapes.title
+        for shape in list(page.shapes):
+            if shape.shape_id != title.shape_id:
+                shape._element.getparent().remove(shape._element)
+        title.left, title.top, title.width, title.height = map(Inches, (.76, 1.09, 11.75, 1.25))
+        title.text = card["title"]
+        for para in title.text_frame.paragraphs:
+            para.font.name = "Aptos Display"
+            para.font.color.rgb = RGBColor.from_string("153F3F")
+            para.font.bold, para.font.size = True, Pt(32 if len(card["title"]) > 65 else 39)
+        label = ("兽医培训简报" if zh else "VETERINARY TRAINING BRIEF") + "    /    " + card["country"].upper()
+        _textbox(page, label, .77, .42, 9.8, .33, 13, "24685D", bold=True)
+        _textbox(page, f"{idx+1:02d} / {len(slides):02d}", 11.50, .42, 1.20, .33, 13, "37615A", bold=True)
+        _textbox(page, card["body"], .78, 2.49, 8.0, 1.91, 22 if len(card["body"]) > 220 else 25, "243B38")
+        _textbox(page, "原始资料页码" if zh else "PUBLISHER SLIDE", 9.35, 2.51, 3.04, .34, 13, "24685D", bold=True)
+        _textbox(page, str(card["page"]), 9.30, 2.94, 2.7, 1.03, 49, "24685D", bold=True)
+        _textbox(page, str(card["issued"] or ""), 9.36, 4.05, 2.93, .4, 15, "3C5750")
+        _textbox(page, "讨论" if zh else "DISCUSSION", .78, 4.74, 8.0, .35, 13, "24685D", bold=True)
+        _textbox(page, card["discussion"], .78, 5.21, 11.60, .89, 19, "243B38")
+        label = ("资料来源  ·  " if zh else "Source   ·   ") + record["deckTitle"].removeprefix("Evidence digest — ")
+        credit = _textbox(page, label, .78, 6.64, 11.80, .62, 12, "37615A")
+        credit.text_frame.paragraphs[0].runs[0].hyperlink.address = record["sourcePage"]
+    deck.save(path)
+
+
 def _assemble(corpus, stage, work, topic, rows, slides, warnings):
     paths, records, parsed = _verify(corpus, rows, work)
     for record, card in zip(records, slides):
@@ -77,6 +115,8 @@ def _assemble(corpus, stage, work, topic, rows, slides, warnings):
         path = work / "excerpts.pptx"
         _evidence_deck([paths[i] for i in indices], [records[i] for i in indices],
                        parsed, topic, path, adaptations=adapted)
+        if any(slides[i]["digest"] for i in indices):
+            _format_digests(path, indices, slides, records)
         return path
 
     native = [i for i, mode in enumerate(methods) if mode == "compilation"]
@@ -144,12 +184,27 @@ def publish(corpus, output, topic, rows, slides, settings, template_path, warnin
             raise ValueError("A source citation or presenter note was lost during generation.")
         layout = validate_layout(deck_path)
         source_count = len({r["sourceHash"] for r in records})
+        numeric_review = []
+        if model_used:
+            for i, (row, card) in enumerate(zip(rows, slides, strict=True), 1):
+                def numbers(value):
+                    return set(re.findall(r"\d+(?:[.,]\d+)*", value))
+                source_numbers = numbers(row["title"] + " " + row["evidence"])
+                new_numbers = numbers(card["title"] + " " + card["body"] + " " + card["notes"]) - source_numbers
+                if new_numbers:
+                    numeric_review.append({"slide": i, "figures_to_check": sorted(new_numbers)})
+            if numeric_review:
+                warnings.append("Some generated figures do not match the source excerpt verbatim. Review the numeric checks.")
+
         qa = {"topic": topic, "requested_slides": settings["count"], "actual_slides": len(deck.slides),
               "coverage_gap": max(0, settings["count"] - len(deck.slides)),
               "distinct_sources": source_count, "source_hashes_and_excerpts_verified": True,
+              "verified_material": "Locally generated editorial digest files and their embedded excerpts"
+                  if all(s["digest"] for s in slides) else "Locally indexed presentation files and their embedded excerpts",
               "source_links_and_speaker_notes_present": notes_verified,
               "method_counts": dict(Counter(record["assemblyMode"] for record in records)),
               "requested_language": settings["language"], "model_used_for_draft": model_used,
+              "generated_figures_needing_review": numeric_review,
               "warnings": list(dict.fromkeys(warnings)), "layout": layout,
               "manual_review": ["Check projected text and chart legibility in PowerPoint.",
                                 "Review source licence exceptions and any third-party visuals.",

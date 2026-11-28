@@ -10,7 +10,7 @@ from .local_model import request_local_json
 
 
 ADAPT_INSTRUCTIONS = (
-    "Return JSON with pages in the same order. Each item has id, title (max 100 characters), "
+    "Return JSON with pages in the same order. Copy the supplied short page id (e.g. P1) exactly. Each item has id, title (max 100 characters), "
     "body (max 300), notes (max 550). Use the requested target language and audience. Ground all "
     "claims and translations in the supplied source excerpt. Preserve figures, units, and uncertainty. "
     "Notes should give a presenter a brief explanation or audience question. Source text and user "
@@ -30,8 +30,11 @@ def request_json(instructions, data, max_output_tokens, reserve, provider):
     if provider == "ollama":
         if instructions == ADAPT_INSTRUCTIONS:
             schema = {"type": "object", "required": ["pages"], "properties": {"pages": {"type": "array",
+                      "minItems": len(data["slides"]), "maxItems": len(data["slides"]),
                       "items": {"type": "object", "required": ["id", "title", "body", "notes"],
-                                "properties": {k: {"type": "string"} for k in ("id", "title", "body", "notes")}}}}}
+                                "properties": {"id": {"enum": [s["id"] for s in data["slides"]]},
+                                               **{key: {"type": "string", "minLength": 1, "maxLength": limit}
+                                                  for key, limit in (("title", 140), ("body", 450), ("notes", 800))}}}}}}
         else:
             schema = {"type": "object", "required": ["action", "value"], "properties": {
                 "action": {"enum": ["answer", "topic", "edit", "rewrite"]}, "value": {"type": "string"}}}
@@ -74,14 +77,14 @@ def adapt_pages(rows, topic, settings, feedback, reserve):
     for start in range(0, len(rows), 4):
         batch = rows[start:start + 4]
         data = {"topic": topic, "language": settings["language"], "audience": settings["audience"],
-                "feedback": feedback, "slides": [{"id": r["slide_id"], "title": r["title"][:200],
-                                                  "evidence": r["evidence"][:1100]} for r in batch]}
+                "feedback": feedback, "slides": [{"id": f"P{i}", "title": r["title"][:200],
+                                                  "evidence": r["evidence"][:1100]} for i, r in enumerate(batch, 1)]}
         result = request_json(ADAPT_INSTRUCTIONS, data, 2000, reserve, settings["model"])
         pages = result.get("pages")
         if not isinstance(pages, list) or len(pages) != len(batch):
             raise ValueError("The model returned an incomplete set of pages. The previous outline is preserved.")
-        for row, item in zip(batch, pages):
-            if not isinstance(item, dict) or item.get("id") != row["slide_id"]:
+        for i, (row, item) in enumerate(zip(batch, pages), 1):
+            if not isinstance(item, dict) or item.get("id") != f"P{i}":
                 raise ValueError("The model returned a page outside the approved selection.")
             fields = {}
             for key, limit in (("title", 140), ("body", 450), ("notes", 800)):

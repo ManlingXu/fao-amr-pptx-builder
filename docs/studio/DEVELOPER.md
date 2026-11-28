@@ -57,3 +57,16 @@ flowchart TD
 **Known limitations.** Source layout and object compatibility can trigger reconstruction. Existing picture text and native chart labels follow the original language. Local structural QA can flag layout risks but cannot establish scientific accuracy, the right to redistribute third-party assets, or final PowerPoint rendering. Original-deck availability changes as publishers update files. The Teams channel, organization permissions, model charges and tenant licensing require verification in the chosen deployment.
 
 **Roadmap.** First, use the pilot prompts and a content-owner review to measure source relevance, translation and layout quality on representative topics. Next, complete an authenticated Dev/Test pilot with isolated output and a measured cost per completed deck. Extend access after CSI signs off the release, telemetry and rollback path. If the audience expands beyond a shared source-access group, implement permission-filtered indexing or separate authorized collections and validate with users with different source access.
+
+### Reproduce the local model comparison
+
+Start Ollama locally and install the model tags under test. These commands run the same two-slide Zambia outreach brief through the offline engine and two local models. The report includes per-page evidence, generated notes, provenance checks, elapsed time and token counts reported by Ollama.
+
+```bash
+ollama pull qwen3:4b
+ollama pull qwen3:0.6b
+python scripts/prepare_studio_sample.py
+python scripts/compare_studio_models.py --corpus .local/studio-sample --model qwen3:4b --model qwen3:0.6b --output .local/model-comparison.json
+```
+
+The measured release run is available in [model-comparison.json](model-comparison.json).

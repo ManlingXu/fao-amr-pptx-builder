@@ -6,6 +6,12 @@ Find approved existing slides, use a constrained Copilot decision layer to plan 
 
 [中文开始](docs/START_HERE_CN.md) · [Start here](docs/START_HERE_EN.md) · **[V2 Storyline workflow](docs/V2_WORKFLOW_EN.md)** · **[V2 中文流程](docs/V2_WORKFLOW_CN.md)** · [Copilot setup](docs/COPILOT_STUDIO_EN.md) · [CSI handoff](docs/CSI_HANDOFF_EN.md)
 
+## PPT Builder Studio
+
+[Open the live browser demo](https://ppt-builder-studio.light-sun-3036.chatgpt.site) to try Teams Mode and inspect Developer Mode. The browser edition works with 40 bilingual summaries linked to pages in six public decks. To run the full workflow locally, use `.\start-studio.cmd` on Windows or `./start-studio.sh` on macOS/Linux, then open `http://127.0.0.1:8768/`. Python 3.11 or later is required.
+
+For the original slide collection, run `.\.venv\Scripts\python.exe scripts\prepare_amr_corpus.py` after the first Windows launch, then relaunch Studio. The 28 November 2026 refresh verified 183 original decks and 4,697 slides. Public-source availability can change between downloads. [Installation, user and developer guides, architecture, Copilot Studio migration and CSI handoff](docs/studio/README.md)
+
 ## 本地 AMR 演示工作台
 
 在 Windows 解压最新版仓库，双击 `start-amr.cmd`。首次启动按 184 份正式目录准备本地资料，复用能通过校验的旧课件，再打开 <http://127.0.0.1:8765>。实际可用数取决于发布方下载情况。新版首页用对话完成选页与导出。输入主题和页数，助手会先给出逐页方案。你可以追问来源或要求调整，确认后下载可编辑初稿，再上传自己的 PPTX 或 POTX 模板。

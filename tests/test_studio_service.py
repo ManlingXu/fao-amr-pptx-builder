@@ -75,3 +75,42 @@ def test_model_writing_preserves_immutable_evidence(tmp_path, monkeypatch, provi
     deck = Presentation(svc.output_dir / version["id"] / version["files"]["pptx"])
     assert deck.slides[0].shapes.title.text == "培训资料"
     assert "请听众举出" in deck.slides[0].notes_slide.notes_text_frame.text
+
+
+def test_scoped_question_keeps_geography_and_discloses_unverified_cost(tmp_path):
+    from presentation_search.brief_conversation import _request
+
+    question = "How did Zambia reach farmers about antibiotic stewardship?"
+    assert _request(question)[0].startswith("How did Zambia")
+    assert _request("Prepare a 2-slide presentation about Zambia farmers")[0] == "Zambia farmers"
+    svc = StudioService(corpus_fixture(tmp_path), tmp_path / "versions")
+    state = svc.new_session()
+    result = svc.turn(state, question.rstrip("?") + ", and the exact programme budget for 2099.", {"count": 2})
+    assert result["slides"] and all("Zambia" in r["source"] for r in result["slides"])
+    assert any("No evidence" in msg and "budget" in msg for msg in result["warnings"])
+    empty = svc.turn(svc.new_session(), "Exact 2099 Zambia stewardship budget", {"count": 2})
+    assert not empty["slides"]
+
+
+def test_paid_provider_reserves_before_sending_and_returns_only_validated_text(monkeypatch):
+    import httpx
+
+    calls = []
+    monkeypatch.setenv("PPT_STUDIO_ENABLE_OPENAI", "1")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-placeholder")
+
+    def reserve(prompt, limit):
+        calls.append(("reserve", prompt, limit))
+        return True
+
+    def reply(endpoint, *, headers, json, timeout):
+        assert calls and calls[0][0] == "reserve"
+        assert endpoint == "https://api.openai.com/v1/responses"
+        assert json["store"] is False and json["max_output_tokens"] == 60
+        return httpx.Response(200, request=httpx.Request("POST", endpoint), json={
+            "status": "completed", "output": [{"type": "message", "content": [
+                {"type": "output_text", "text": '{"action":"answer","value":"See slide 1."}'}]}]})
+
+    monkeypatch.setattr(studio_model.httpx, "post", reply)
+    assert studio_model.request_json("Return JSON", {"prompt": "Hello"}, 60, reserve, "openai")["action"] == "answer"
+    assert "Hello" in calls[0][1]

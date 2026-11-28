@@ -72,13 +72,25 @@ def _is_zh(value):
     return bool(re.search(r"[\u3400-\u9fff]", value))
 
 
+def _discussion(row, language):
+    questions = {
+        "Context": ("Which part of this finding matters most in your setting?", "这项发现对本地工作最重要的部分是什么？"),
+        "Policy": ("Which institutions would need to act together on this point?", "落实这一点需要哪些机构合作？"),
+        "Implementation": ("Who would carry out this activity, and how would they reach the intended audience?", "由谁开展这项活动，又该如何联系目标人群？"),
+        "Monitoring": ("What records would your team need to track progress?", "团队需要记录哪些信息才能跟踪进展？"),
+        "Next steps": ("Which next step could your team explore first?", "团队可以先研究哪项后续行动？")}
+    options = questions.get(row["stage"], questions["Context"])
+    return options[language == "zh"]
+
+
 def _note(row, cfg):
     audience = cfg["audience"]
+    question = _discussion(row, cfg["language"])
     if cfg["language"].lower().startswith("zh"):
         return (f"向{audience}介绍这页资料。说明证据来自《{row['deck_title']}》，"
-                f"请听众讨论这段原文与当前工作有何关联。\n{row['evidence']}")
+                f"与听众讨论：{question}\n{row['evidence']}")
     return (f"For {audience}: introduce the excerpt from {row['deck_title']}. "
-            f"Read the evidence in context, then ask which part applies to the audience’s work.\n{row['evidence']}")
+            f"Read the evidence in context, then ask: {question}\n{row['evidence']}")
 
 
 def _evidence_title(row):
@@ -91,6 +103,19 @@ def _evidence_title(row):
         return first
     short = first[:94].rsplit(" ", 1)[0].rstrip(" ,;:，；：")
     return (short or first[:94]) + "…"
+
+
+BUDGET = re.compile(r"\bbudgets?\b|预算|預算|presupuesto|bilancio", re.I)
+MONEY = re.compile(r"[$€£]\s*\d|(?:USD|GBP|EUR|ZMW)\s*[\d,.]+|[\d,.]+\s*(?:million|billion|thousand)?\s*(?:USD|GBP|EUR|ZMW|dollars?|euros?|kwacha|美元|欧元|元)", re.I)
+
+
+def _budget_covered(topic, rows):
+    years = set(re.findall(r"(?<!\d)(?:19|20)\d{2}(?!\d)", topic))
+    for row in rows:
+        evidence = row["evidence"]
+        if BUDGET.search(evidence) and MONEY.search(evidence) and all(year in evidence for year in years):
+            return True
+    return False
 
 
 def _method(row, settings):
@@ -147,6 +172,8 @@ class StudioService:
                 "local_page": row["slide_number"], "digest": original_page is not None,
                 "url": row["source_url"], "issued": row["issued"], "method": method,
                 "notes": adaptation.get("notes", _note(row, state.settings)), "id": row["slide_id"],
+                "discussion": _discussion(row, state.settings["language"]), "country": card.get("country", ""),
+                "display_language": state.settings["language"],
                 "source_language": state.settings["language"] if card and state.settings["language"] in ("en", "zh") else row.get("language", ""), "reason": row.get("reason", "")})
         return result
 
@@ -155,6 +182,9 @@ class StudioService:
         warnings = list(state.warnings)
         if 0 <= len(state.selected) < state.settings["count"] and state.topic:
             warnings.append(f"{len(state.selected)} of {state.settings['count']} requested slides have evidence.")
+        if BUDGET.search(state.topic) and not _budget_covered(state.topic, state.selected):
+            warnings.append("未找到可核验的预算金额。" if _is_zh(state.topic) else
+                            "No evidence for the requested budget amount in the selected excerpts.")
         slides = self._slides(state)
         sources_differ = any(row["source_language"] and state.settings["language"].casefold()
                              not in re.split(r"[/,; ]+", row["source_language"].casefold()) for row in slides)
@@ -172,13 +202,30 @@ class StudioService:
                 "stats": stats, "model_used": state.model_used, "warnings": list(dict.fromkeys(warnings))}
 
     def _search(self, state, topic, count, blocked=()):
-        pool = self._index().search(topic, min(120, count * 3 + len(blocked) + 10),
+        research_topic = topic
+        if BUDGET.search(topic):
+            clauses = re.split(r"[,，;；]|\band\b|以及|并且|同时", topic, flags=re.I)
+            remaining = [c.strip() for c in clauses if c.strip() and not BUDGET.search(c)]
+            if remaining:
+                research_topic = " ".join(remaining)
+        pool = self._index().search(research_topic, min(120, count * 3 + len(blocked) + 10),
                                     min_year=state.settings["min_year"])
         candidates = [r for r in pool if r["slide_id"] not in blocked]
+        if BUDGET.search(topic) and research_topic == topic:
+            candidates = [r for r in candidates if _budget_covered(topic, [r])]
         if state.settings["model"] == "offline":
             language = state.settings["language"].casefold()
             candidates.sort(key=lambda r: language not in re.split(r"[/,; ]+", r.get("language", "").casefold()))
-        return order_story(candidates[:count])
+        selected = []
+        for row in candidates[:count]:
+            local_number = str(row["slide_number"])
+            original = self.page_map.get(row["deck_id"], {}).get(local_number)
+            digest = self.digests.get((row["deck_id"], original))
+            if digest:
+                # The canonical editorial statement is embedded verbatim in the local digest slide.
+                row = dict(row, evidence=digest["evidence"], evidence_field="body", title=digest["title"])
+            selected.append(row)
+        return order_story(selected)
 
     def _edit(self, state, text, zh):
         length = conversation._LENGTH_CHANGE.fullmatch(text) or conversation._COUNT.fullmatch(text)
@@ -278,14 +325,17 @@ class StudioService:
         zh = _is_zh(text) or (not text and candidate.settings["language"] == "zh")
         changed = {k for k, val in candidate.settings.items() if state.settings[k] != val}
         # A form change takes effect on export as well as on chat.
-        if state.topic and changed & {"min_year", "count"}:
+        changing_topic = action == "chat" and conversation._TOPIC_CHANGE.fullmatch(text)
+        if state.topic and not changing_topic and changed & {"min_year", "count"}:
             if "min_year" in changed:
                 candidate.selected = self._search(candidate, candidate.topic, candidate.settings["count"], candidate.excluded)
             else:
                 self._edit(candidate, f"change length to {candidate.settings['count']} slides", zh)
-            self._adapt(candidate, reserve_model, all_pages=False)
-        if state.topic and changed & {"model", "language", "audience"}:
-            self._adapt(candidate, reserve_model)
+        if state.topic and not changing_topic:
+            if changed & {"model", "language", "audience"}:
+                self._adapt(candidate, reserve_model)
+            elif changed & {"min_year", "count"}:
+                self._adapt(candidate, reserve_model, all_pages=False)
 
         if action == "generate" or conversation._CONFIRM.fullmatch(text):
             reply = self._generate(candidate, template_path, zh)
