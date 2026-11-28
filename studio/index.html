@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ebeaf5">
+  <title>PPT Builder · Teams Mode</title>
+  <link rel="stylesheet" href="teams.css">
+</head>
+<body>
+<svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<defs>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-3-.35-4.2-1.05L3.5 20l1.2-4.1a8.5 8.5 0 1 1 15.8-4.4Z"/><path d="M8.8 10h6.4M8.8 13.5h4.6"/></symbol>
+<symbol id="i-files" viewBox="0 0 24 24"><path d="M3.5 7a2 2 0 0 1 2-2h5l2.3 2.3H19a1.7 1.7 0 0 1 1.7 1.7v9a1.8 1.8 0 0 1-1.8 1.8H5.3A1.8 1.8 0 0 1 3.5 18Z"/></symbol>
+<symbol id="i-studio" viewBox="0 0 24 24"><path d="m7.5 4.1 9.1 5.2-9.1 5.3L3 12.1V6.7Z"/><path d="m12.5 9 8.2 4.7v3.6L16.1 20l-8.6-5M3.1 11.9v5.2l4.4 2.5 4.4-2.6"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3c.5-2.9 5.3-3 5.3.1 0 2-2.8 2.2-2.8 4.3M12 17h.01"/></symbol>
+<symbol id="i-compose" viewBox="0 0 24 24"><path d="M12 5.4H6a1.8 1.8 0 0 0-1.8 1.8v10.9A1.8 1.8 0 0 0 6 20h10.9a1.8 1.8 0 0 0 1.8-1.8v-6"/><path d="m10 14 1-4 7.2-7.1 2.8 2.8L13.9 13Z"/></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="m3.7 4.5 17.1 7.4-17.1 7.5 2.5-7.5Z"/><path d="M6.2 11.9h14"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M3 7h5m4 0h9M3 17h10m4 0h4"/><circle cx="10" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></symbol>
+<symbol id="i-slide" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="13" rx="1.7"/><path d="M8 21h8m-4-3.3v3.1M7 9h7M7 12.5h4"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.1C8.9 4.5 6.1 4.4 3 5.2v13.7c3.1-.8 5.9-.8 9 1 3.1-1.8 5.9-1.8 9-1V5.2c-3.1-.8-5.9-.7-9 .9Z"/><path d="M12 6.3v13.2"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3.3 12h17.4"/></symbol>
+<symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 3c.4 8.9-.9 15-7.8 15.2a6.5 6.5 0 0 1-6.5-6.3C5.7 5 13 6 20 3Z"/><path d="m3.5 20.5 11-11"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="m14 3 7 7-2 1.1-2.5-.2-4.1 4.5.4 2.2-1.3 1.3-6.3-6.3L6.5 11l2.2.5L13 7.3l-.2-2.5Z"/><path d="m7.5 16.5-4.2 4.2"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v11m-4-4 4 4 4-4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.5 4.8 4.7L19.7 6.8"/></symbol>
+</defs></svg>
+<header class="globalbar">
+  <div class="suite"><button class="mobile-menu icon-btn" id="mobile-menu" aria-label="Open navigation"><svg><use href="#i-menu"/></svg></button><span class="teams-logo" aria-hidden="true"><i></i><b>T</b></span><strong>Microsoft Teams</strong><span class="demo-label">Demo</span></div>
+  <button class="search-trigger" id="open-search"><svg><use href="#i-search"/></svg><span>Search this workspace</span><kbd>Ctrl K</kbd></button>
+  <div class="global-user"><span id="session-label">Teams Mode</span><button id="account" class="user-avatar" aria-label="Session details">U</button></div>
+</header>
+<div class="shell">
+  <nav class="rail" aria-label="Workspace apps">
+    <button class="rail-item on" data-view="chat"><svg><use href="#i-chat"/></svg><span>Chat</span></button>
+    <button class="rail-item" data-view="files"><svg><use href="#i-files"/></svg><span>Files</span></button>
+    <a class="rail-item" href="studio.html"><svg><use href="#i-studio"/></svg><span>Studio</span></a>
+    <button class="rail-item rail-bottom" id="help"><svg><use href="#i-help"/></svg><span>Help</span></button>
+  </nav>
+  <aside class="sidebar" id="sidebar" aria-label="Chat list">
+    <div class="side-top"><h2>Chat</h2><button id="new-chat" class="icon-btn" title="New brief" aria-label="New brief"><svg><use href="#i-compose"/></svg></button></div>
+    <div class="section-label"><svg><use href="#i-chevron"/></svg> Favourites</div>
+    <button class="bot-row" data-view="chat"><span class="ppt-icon small" aria-hidden="true"><i></i><b>P</b></span><span><strong>PPT Builder</strong><small>Presentation agent</small></span></button>
+    <div class="section-label second"><svg><use href="#i-chevron"/></svg> Current session</div>
+    <div id="recents"></div>
+    <a class="studio-shortcut" href="studio.html"><svg><use href="#i-studio"/></svg><span>Developer Mode</span><svg class="arrow-link"><use href="#i-right"/></svg></a>
+  </aside>
+  <main>
+    <header class="agent-bar">
+      <span class="ppt-icon small" aria-hidden="true"><i></i><b>P</b></span><strong>PPT Builder</strong><span class="agent-label">Agent</span>
+      <nav aria-label="Agent views"><button class="tab active" data-view="chat">Chat</button><button class="tab" data-view="files">Shared files</button></nav>
+      <button class="icon-btn head-settings" title="Deck settings" aria-label="Deck settings" data-open-settings><svg><use href="#i-sliders"/></svg></button>
+    </header>
+    <div id="chat-pane" class="chat-pane">
+      <div class="scroller" id="scroll">
+        <section class="welcome" id="welcome">
+          <div class="welcome-art" aria-hidden="true"><span class="art-slide art-back"></span><span class="art-slide art-front"><i></i><b></b><em></em></span><span class="art-p">P</span><span class="art-spark">✦</span></div>
+          <h1>What would you like to present?</h1>
+          <p>Build an editable PowerPoint from the AMR slide library. Review the outline, refine it in chat, and trace each slide to its source.</p>
+          <div class="prompts" id="prompts"></div>
+        </section>
+        <section class="thread" id="thread" aria-label="Conversation"></section>
+      </div>
+      <div class="composer-wrap"><div class="composer">
+        <label class="sr-only" for="message">Message PPT Builder</label><textarea id="message" rows="2" placeholder="Message PPT Builder…"></textarea>
+        <div class="composer-tools"><button class="settings-chip" data-open-settings><svg><use href="#i-sliders"/></svg>Deck settings</button><span id="setting-summary"></span><button class="send-btn" id="send" aria-label="Send message" title="Send message"><svg><use href="#i-send"/></svg></button></div>
+      </div><div class="composer-foot"><span id="edition-note"></span><span>Enter to send</span></div></div>
+    </div>
+    <section id="files-pane" class="files-pane" hidden></section>
+  </main>
+</div>
+<dialog id="modal"><div class="dialog-top"><div><small id="dialog-kicker"></small><h2 id="dialog-title"></h2></div><button id="close-dialog" class="icon-btn" aria-label="Close"><svg><use href="#i-x"/></svg></button></div><div id="dialog-body"></div></dialog>
+<div class="toast" id="toast" role="status"></div>
+<script src="edition.js"></script><script src="browser-engine.js"></script><script src="teams.js"></script>
+</body>
+</html>

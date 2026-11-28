@@ -1,0 +1,278 @@
+{
+  "input_corpus": "Prepared local manifest",
+  "run_utc": "2026-11-28T02:10:42+00:00",
+  "platform": "Linux x86_64",
+  "brief": "Zambia outreach to livestock farmers and traditional leaders on antimicrobial stewardship",
+  "settings": {
+    "count": 2,
+    "audience": "Veterinary outreach coordinators",
+    "mode": "reconstruction",
+    "language": "en",
+    "template": "original"
+  },
+  "model_calls_to_paid_services": 0,
+  "corpus_manifest_sha256": "6acf87bed83b4d555e28bc5e82d9e0ff89544b82f31b493381efd0a6285cb560",
+  "method": "One matched Studio drafting turn per provider using a preloaded source index. Wall time includes any model load; Ollama reports token counts and inference times separately. Source identity is checked against the offline control. One case measures functionality and supports a qualitative review.",
+  "runs": [
+    {
+      "provider": "offline",
+      "model": "offline",
+      "calls": [],
+      "status": "completed",
+      "model_used": false,
+      "warnings": [],
+      "pages": [
+        {
+          "title": "Farm outreach and early reporting",
+          "body": "The presentation links farmer awareness with better husbandry, biosecurity, farm hygiene guidance and early reporting of animal disease.",
+          "notes": "For Veterinary outreach coordinators: introduce the excerpt from Evidence digest — Antimicrobial resistance and antimicrobial stewardship in the animal and veterinary field in Zambia. Read the evidence in context, then ask: Who would carry out this activity, and how would they reach the intended audience?\nThe presentation links farmer awareness with better husbandry, biosecurity, farm hygiene guidance and early reporting of animal disease.",
+          "source": "Evidence digest — Antimicrobial resistance and antimicrobial stewardship in the animal and veterinary field in Zambia",
+          "page": 8,
+          "url": "https://drive.google.com/file/d/1sUqmUiCrPjQj25qvbXXYgsQTPYus3NIr/view",
+          "evidence": "The presentation links farmer awareness with better husbandry, biosecurity, farm hygiene guidance and early reporting of animal disease.",
+          "id": "7ac89968843a26d1f6f8a5cd"
+        },
+        {
+          "title": "Reaching farmers and community leaders",
+          "body": "Radio, meetings and training reached farmers, traditional and civic leaders, and agricultural input dealers.",
+          "notes": "For Veterinary outreach coordinators: introduce the excerpt from Evidence digest — Antimicrobial resistance and antimicrobial stewardship in the animal and veterinary field in Zambia. Read the evidence in context, then ask: Who would carry out this activity, and how would they reach the intended audience?\nRadio, meetings and training reached farmers, traditional and civic leaders, and agricultural input dealers.",
+          "source": "Evidence digest — Antimicrobial resistance and antimicrobial stewardship in the animal and veterinary field in Zambia",
+          "page": 10,
+          "url": "https://drive.google.com/file/d/1sUqmUiCrPjQj25qvbXXYgsQTPYus3NIr/view",
+          "evidence": "Radio, meetings and training reached farmers, traditional and civic leaders, and agricultural input dealers.",
+          "id": "dea5f5652574c38bd161fadb"
+        }
+      ],
+      "checks": {
+        "requested_pages_present": true,
+        "source_ids_urls_pages_evidence_match_control": true,
+        "notes_nonempty": true,
+        "unmatched_numeric_strings_in_bodies": []
+      },
+      "wall_seconds": 0.01
+    },
+    {
+      "provider": "ollama",
+      "model": "qwen3:4b",
+      "calls": [
+        {
+          "prompt_eval_count": 263,
+          "eval_count": 231,
+          "done_reason": "stop",
+          "total_duration_seconds": 46.006,
+          "load_duration_seconds": 8.388,
+          "prompt_eval_duration_seconds": 5.994,
+          "eval_duration_seconds": 31.612,
+          "page_ids_returned": [
+            "P1",
+            "P2"
+          ]
+        }
+      ],
+      "ollama_version": "0.40.19",
+      "model_digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+      "weights": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "qwen3",
+        "families": [
+          "qwen3"
+        ],
+        "parameter_size": "4.0B",
+        "quantization_level": "Q4_K_M",
+        "context_length": 262144,
+        "embedding_length": 2560,
+        "runner": "ggml"
+      },
+      "status": "completed",
+      "model_used": true,
+      "warnings": [],
+      "pages": [
+        {
+          "title": "Farm outreach and early reporting",
+          "body": "This outreach strategy emphasizes linking farmer awareness with improved husbandry practices, biosecurity measures, and farm hygiene protocols. Early reporting of animal disease is critical for timely intervention and preventing the spread of infections. By engaging farmers in these areas, the program aims to reduce the risk of antimicrobial resistance through responsible use of antibiotics.",
+          "notes": "Presenter: How does early disease reporting impact antimicrobial resistance? Audience: What specific indicators show improved reporting accuracy?",
+          "source": "Evidence digest — Antimicrobial resistance and antimicrobial stewardship in the animal and veterinary field in Zambia",
+          "page": 8,
+          "url": "https://drive.google.com/file/d/1sUqmUiCrPjQj25qvbXXYgsQTPYus3NIr/view",
+          "evidence": "The presentation links farmer awareness with better husbandry, biosecurity, farm hygiene guidance and early reporting of animal disease.",
+          "id": "7ac89968843a26d1f6f8a5cd"
+        },
+        {
+          "title": "Reaching farmers and community leaders",
+          "body": "The initiative utilizes radio broadcasts, community meetings, and targeted training sessions to connect with farmers, traditional leaders, and agricultural input dealers. This multi-channel approach ensures that critical information on antimicrobial stewardship reaches diverse stakeholders within the community.",
+          "notes": "Presenter: Why is engagement with traditional leaders important? Audience: How do you measure the effectiveness of radio-based outreach?",
+          "source": "Evidence digest — Antimicrobial resistance and antimicrobial stewardship in the animal and veterinary field in Zambia",
+          "page": 10,
+          "url": "https://drive.google.com/file/d/1sUqmUiCrPjQj25qvbXXYgsQTPYus3NIr/view",
+          "evidence": "Radio, meetings and training reached farmers, traditional and civic leaders, and agricultural input dealers.",
+          "id": "dea5f5652574c38bd161fadb"
+        }
+      ],
+      "checks": {
+        "requested_pages_present": true,
+        "source_ids_urls_pages_evidence_match_control": true,
+        "notes_nonempty": true,
+        "unmatched_numeric_strings_in_bodies": []
+      },
+      "wall_seconds": 46.093
+    },
+    {
+      "provider": "ollama",
+      "model": "qwen3:0.6b",
+      "calls": [
+        {
+          "prompt_eval_count": 269,
+          "eval_count": 162,
+          "done_reason": "stop",
+          "total_duration_seconds": 8.128,
+          "load_duration_seconds": 2.846,
+          "prompt_eval_duration_seconds": 0.834,
+          "eval_duration_seconds": 4.443,
+          "page_ids_returned": [
+            "P1",
+            "P2"
+          ]
+        }
+      ],
+      "ollama_version": "0.40.19",
+      "model_digest": "7df6b6e09427a769808717c0a93cadc4ae99ed4eb8bf5ca557c90846becea435",
+      "weights": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "qwen3",
+        "families": [
+          "qwen3"
+        ],
+        "parameter_size": "751.63M",
+        "quantization_level": "Q4_K_M",
+        "context_length": 40960,
+        "embedding_length": 1024,
+        "runner": "ggml"
+      },
+      "status": "completed",
+      "model_used": true,
+      "warnings": [],
+      "pages": [
+        {
+          "title": "Farm outreach and early reporting",
+          "body": "The presentation links farmer awareness with better husbandry, biosecurity, farm hygiene guidance and early reporting of animal disease.",
+          "notes": "This slide highlights how awareness programs improve husbandry practices and disease reporting, which are critical for antimicrobial stewardship efforts.",
+          "source": "Evidence digest — Antimicrobial resistance and antimicrobial stewardship in the animal and veterinary field in Zambia",
+          "page": 8,
+          "url": "https://drive.google.com/file/d/1sUqmUiCrPjQj25qvbXXYgsQTPYus3NIr/view",
+          "evidence": "The presentation links farmer awareness with better husbandry, biosecurity, farm hygiene guidance and early reporting of animal disease.",
+          "id": "7ac89968843a26d1f6f8a5cd"
+        },
+        {
+          "title": "Reaching farmers and community leaders",
+          "body": "Radio, meetings and training reached farmers, traditional and civic leaders, and agricultural input dealers.",
+          "notes": "This slide emphasizes outreach methods that ensure all relevant stakeholders are engaged in the antimicrobial stewardship initiatives.",
+          "source": "Evidence digest — Antimicrobial resistance and antimicrobial stewardship in the animal and veterinary field in Zambia",
+          "page": 10,
+          "url": "https://drive.google.com/file/d/1sUqmUiCrPjQj25qvbXXYgsQTPYus3NIr/view",
+          "evidence": "Radio, meetings and training reached farmers, traditional and civic leaders, and agricultural input dealers.",
+          "id": "dea5f5652574c38bd161fadb"
+        }
+      ],
+      "checks": {
+        "requested_pages_present": true,
+        "source_ids_urls_pages_evidence_match_control": true,
+        "notes_nonempty": true,
+        "unmatched_numeric_strings_in_bodies": []
+      },
+      "wall_seconds": 8.235
+    }
+  ],
+  "corpus_counts": {
+    "decks": 6,
+    "slides": 40,
+    "failed_decks": 0
+  },
+  "quality_review": {
+    "scope": "Manual comparison against the two supplied source excerpts. CPU run on the bundled 6-deck/40-page corpus with one English audience brief.",
+    "offline": "Both slide bodies retained the curated evidence text. Notes used the same audience-directed question format.",
+    "qwen3:4b": "Both original page references and source excerpts were preserved. The questions in the notes were tailored to outreach coordinators. On page 8 the generated body added claims about stopping infections and a programme aim of reducing antimicrobial resistance through responsible antibiotic use. Neither claim was stated in that page excerpt. Page 10 omitted civic leaders. Treat these as unsupported elaboration and an omission requiring editing.",
+    "qwen3:0.6b": "The slide bodies reproduced both source excerpts verbatim, including the civic leaders on page 10. Notes on page 8 strengthened a link to a causal improvement. Page 10 notes said outreach ensured all relevant stakeholders were engaged; the source only named groups reached.",
+    "interpretation": "Matching source IDs, evidence and numeric strings verifies provenance only. Verify synthesized claims and notes against the full original slide and remove unsupported claims before presentation. The measured latency includes model load; this single pair of outputs does not rank the models across tasks."
+  },
+  "repeat_with_final_schema": {
+    "run_utc": "2026-11-28T02:12:05+00:00",
+    "purpose": "Verify the final decoder schema with nonempty and maximum-length fields. Both models reproduced the first measured outputs exactly.",
+    "runs": [
+      {
+        "model": "offline",
+        "status": "completed",
+        "wall_seconds": 0.008,
+        "calls": [],
+        "page_content_identical": true
+      },
+      {
+        "model": "qwen3:4b",
+        "status": "completed",
+        "wall_seconds": 45.583,
+        "calls": [
+          {
+            "prompt_eval_count": 263,
+            "eval_count": 231,
+            "done_reason": "stop",
+            "total_duration_seconds": 45.504,
+            "load_duration_seconds": 10.641,
+            "prompt_eval_duration_seconds": 6.521,
+            "eval_duration_seconds": 28.331,
+            "page_ids_returned": [
+              "P1",
+              "P2"
+            ],
+            "output_field_lengths": [
+              {
+                "title": 33,
+                "body": 394,
+                "notes": 145
+              },
+              {
+                "title": 38,
+                "body": 312,
+                "notes": 136
+              }
+            ]
+          }
+        ],
+        "page_content_identical": true
+      },
+      {
+        "model": "qwen3:0.6b",
+        "status": "completed",
+        "wall_seconds": 7.587,
+        "calls": [
+          {
+            "prompt_eval_count": 269,
+            "eval_count": 162,
+            "done_reason": "stop",
+            "total_duration_seconds": 7.508,
+            "load_duration_seconds": 2.34,
+            "prompt_eval_duration_seconds": 0.955,
+            "eval_duration_seconds": 4.206,
+            "page_ids_returned": [
+              "P1",
+              "P2"
+            ],
+            "output_field_lengths": [
+              {
+                "title": 33,
+                "body": 136,
+                "notes": 153
+              },
+              {
+                "title": 38,
+                "body": 108,
+                "notes": 134
+              }
+            ]
+          }
+        ],
+        "page_content_identical": true
+      }
+    ]
+  }
+}

@@ -75,7 +75,7 @@ def _add_source_notes(slide, record):
     if frame is None:
         raise ValueError("The source notes master lacks an editable notes body.")
     for line in [
-        "", f"{record['deckTitle']} · Original slide {record['slideNumber']}",
+        "", f"{record['deckTitle']} · Original slide {record.get('originalPublisherSlide', record['slideNumber'])}",
         " · ".join(filter(None, [record["author"], record["publisher"], record["issued"]])),
         record["sourcePage"], record["license"], "SHA-256 " + record["sourceHash"],
         "Selected passage", record["evidence"],
@@ -371,7 +371,7 @@ def _draw_table(target, rows):
                 paragraph.font.size = Pt(14 if len(row) > 4 or len(value) > 40 else 18)
 
 
-def _evidence_deck(paths, records, parsed, topic, output):
+def _evidence_deck(paths, records, parsed, topic, output, adaptations=None):
     deck = Presentation()
     deck.slide_width, deck.slide_height = Inches(13.333), Inches(7.5)
     deck.core_properties.title = topic
@@ -390,6 +390,9 @@ def _evidence_deck(paths, records, parsed, topic, output):
             edition_text = " ".join(edition.groups())
             if edition_text.casefold() not in title.casefold():
                 title = f"{title}  ·  {edition_text}"
+        adaptation = (adaptations or {}).get(record["slideId"])
+        if adaptation:
+            title = adaptation["title"]
         record["displayTitle"] = title
         heading = target.shapes.title
         heading.left, heading.top, heading.width, heading.height = map(Inches, (.7, .23, 11.9, 1.17))
@@ -415,6 +418,8 @@ def _evidence_deck(paths, records, parsed, topic, output):
             body = _excerpt_text(page, parts, caption, content_title, 300 if visual else 700)
             if title != content_title and body.startswith(title):
                 body = body[len(title):].strip()
+        if adaptation and rows is None:
+            body = adaptation["body"]
         if picture:
             # The original aspect ratio is preserved. A photo without a separate
             # caption can use the entire content area below the title.
@@ -437,7 +442,7 @@ def _evidence_deck(paths, records, parsed, topic, output):
             for paragraph in shape.text_frame.paragraphs:
                 paragraph.font.color.theme_color = MSO_THEME_COLOR.TEXT_1
         credit = record["publisher"] or record["author"] or record["deckTitle"]
-        label = f"{credit[:95]}   ·   Original slide {number}"
+        label = f"{credit[:95]}   ·   Original slide {record.get('originalPublisherSlide', number)}"
         footer = _textbox(target, label, .85, 6.79, 11.6, .38, 11, "355C6F")
         footer.text_frame.paragraphs[0].runs[0].hyperlink.address = record["sourcePage"]
         frame = target.notes_slide.notes_text_frame

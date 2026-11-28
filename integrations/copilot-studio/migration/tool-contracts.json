@@ -1,0 +1,102 @@
+{
+  "document": "../openapi-entra.swagger.json",
+  "pilotAlternative": "../openapi-api-key.swagger.json",
+  "operations": [
+    {
+      "id": "SearchSlides",
+      "method": "POST",
+      "path": "/api/search",
+      "inputPointer": "/paths/~1api~1search/post/parameters",
+      "success": 200,
+      "outputPointer": "/paths/~1api~1search/post/responses/200/schema"
+    },
+    {
+      "id": "AnalyzeSlides",
+      "method": "POST",
+      "path": "/api/slides/analyze",
+      "inputPointer": "/paths/~1api~1slides~1analyze/post/parameters",
+      "success": 200,
+      "outputPointer": "/paths/~1api~1slides~1analyze/post/responses/200/schema"
+    },
+    {
+      "id": "GetSlideVersions",
+      "method": "GET",
+      "path": "/api/slides/{slide_id}/versions",
+      "inputPointer": "/paths/~1api~1slides~1{slide_id}~1versions/get/parameters",
+      "success": 200,
+      "outputPointer": "/paths/~1api~1slides~1{slide_id}~1versions/get/responses/200/schema"
+    },
+    {
+      "id": "UploadTemplate",
+      "method": "POST",
+      "path": "/api/templates",
+      "inputPointer": "/paths/~1api~1templates/post/parameters",
+      "success": 201,
+      "outputPointer": "/paths/~1api~1templates/post/responses/201/schema"
+    },
+    {
+      "id": "ApplyTemplate",
+      "method": "POST",
+      "path": "/api/drafts/{job_id}/template",
+      "inputPointer": "/paths/~1api~1drafts~1{job_id}~1template/post/parameters",
+      "success": 202,
+      "outputPointer": "/paths/~1api~1drafts~1{job_id}~1template/post/responses/202/schema"
+    },
+    {
+      "id": "PlanPresentation",
+      "method": "POST",
+      "path": "/api/plans",
+      "inputPointer": "/paths/~1api~1plans/post/parameters",
+      "success": 201,
+      "outputPointer": "/paths/~1api~1plans/post/responses/201/schema"
+    },
+    {
+      "id": "GetPresentationPlan",
+      "method": "GET",
+      "path": "/api/plans/{plan_id}",
+      "inputPointer": "/paths/~1api~1plans~1{plan_id}/get/parameters",
+      "success": 200,
+      "outputPointer": "/paths/~1api~1plans~1{plan_id}/get/responses/200/schema"
+    },
+    {
+      "id": "RevisePresentationPlan",
+      "method": "PUT",
+      "path": "/api/plans/{plan_id}",
+      "inputPointer": "/paths/~1api~1plans~1{plan_id}/put/parameters",
+      "success": 200,
+      "outputPointer": "/paths/~1api~1plans~1{plan_id}/put/responses/200/schema"
+    },
+    {
+      "id": "CreateDraftFromPlan",
+      "method": "POST",
+      "path": "/api/plans/{plan_id}/draft",
+      "inputPointer": "/paths/~1api~1plans~1{plan_id}~1draft/post/parameters",
+      "success": 202,
+      "outputPointer": "/paths/~1api~1plans~1{plan_id}~1draft/post/responses/202/schema"
+    },
+    {
+      "id": "CreateDraft",
+      "method": "POST",
+      "path": "/api/drafts",
+      "inputPointer": "/paths/~1api~1drafts/post/parameters",
+      "success": 202,
+      "outputPointer": "/paths/~1api~1drafts/post/responses/202/schema"
+    },
+    {
+      "id": "GetDraftStatus",
+      "method": "GET",
+      "path": "/api/drafts/{job_id}",
+      "inputPointer": "/paths/~1api~1drafts~1{job_id}/get/parameters",
+      "success": 200,
+      "outputPointer": "/paths/~1api~1drafts~1{job_id}/get/responses/200/schema"
+    },
+    {
+      "id": "GetLayoutReport",
+      "method": "GET",
+      "path": "/api/drafts/{job_id}/layout-report",
+      "inputPointer": "/paths/~1api~1drafts~1{job_id}~1layout-report/get/parameters",
+      "success": 200,
+      "outputPointer": "/paths/~1api~1drafts~1{job_id}~1layout-report/get/responses/200/schema"
+    }
+  ]
+}

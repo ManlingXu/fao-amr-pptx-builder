@@ -27,19 +27,19 @@ from .providers.base import MAX_FILE_BYTES, MAX_LIBRARY_FILES
 # not where an international workshop happened to take place.
 CONCEPTS = {
     "amr": "amr|antimicrobial resistance|antibiotic resistance|resistant|resistance|耐药性|耐药|抗药性",
-    "antibiotic": "antibiotic|antibiotics|antimicrobial|antimicrobials|抗微生物药物|抗菌药物|抗生素|抗菌药",
-    "stewardship": "stewardship|ams|prudent|responsible use|rational use|appropriate use|judicious use|合理使用|合理用药|审慎用药|用药管理|审慎使用",
+    "antibiotic": "antibiotic|antibiotics|antimicrobial|antimicrobials|antibiotici|antibiotiques|antibioticos|抗微生物药物|抗菌药物|抗生素|抗菌药",
+    "stewardship": "stewardship|ams|prudent|uso prudente|usage prudent|responsible use|rational use|appropriate use|judicious use|合理使用|合理用药|审慎用药|用药管理|审慎使用",
     "use": "amu|amc|consumption|antimicrobial use|antibiotic use|用量|使用量|消耗量",
     "animal": "animal|animals|veterinary|veterinarian|veterinarians|livestock|farm animals|farmed animals|food-producing animals|兽医|兽用|动物|畜牧|畜禽|养殖",
-    "poultry": "poultry|chicken|chickens|broiler|broilers|flock|家禽|养鸡|肉鸡|鸡群",
+    "poultry": "poultry|chicken|chickens|broiler|broilers|turkey|turkeys|flock|polli da carne|tacchini|avicoli|volaille|avicultura|家禽|养鸡|肉鸡|鸡群",
     "pigs": "pig|pigs|porcine|swine|piglets|生猪|养猪|猪",
     "cattle": "cattle|bovine|dairy|dairy cows|cow|cows|奶牛|肉牛|牛群|乳牛",
     "aquaculture": "aquaculture|farmed fish|fish|水产|鱼类|养鱼",
     "human": "human health|hospital|hospitals|clinical wards|hospitalised|医院|人医|人类健康|住院",
     "onehealth": "one health|one-health|multisectoral|同一健康|一个健康|跨部门",
-    "farmers": "farmer|farmers|smallholder|smallholders|farmers'|农户|养殖户|农民",
-    "leaders": "traditional leaders|civic leaders|community leaders|traditional chiefs|传统领袖|社区领袖|传统领导",
-    "awareness": "awareness|outreach|radio|sensitization|sensitisation|engagement|campaign|reach|宣传|广播|提高意识|外展",
+    "farmers": "farmer|farmers|ganaderos|eleveurs|agriculteurs|allevatori|smallholder|smallholders|farmers'|农户|养殖户|农民",
+    "leaders": "traditional leaders|chefs traditionnels|lideres tradicionales|civic leaders|community leaders|traditional chiefs|传统领袖|社区领袖|传统领导",
+    "awareness": "awareness|outreach|radio|sensibilisation|sensibilizzazione|concienciar|sensitization|sensitisation|engagement|campaign|reach|宣传|广播|提高意识|外展",
     "training": "training|trainings|trained|education|mentorship|workshop|培训|教育|能力建设",
     "policy": "policy|policies|action plan|action plans|national plan|legislation|regulation|regulations|guidelines|legislative|政策|行动计划|立法|法规|指南",
     "surveillance": "surveillance|monitor|monitoring|tracking|监测|监控",
@@ -47,19 +47,20 @@ CONCEPTS = {
     "mg/kg": "mg/kg|mg per kg|毫克/千克|毫克每千克",
     "population-adjusted": "adjusted for animal population|animal population|动物群体规模|动物群体数量|动物总量",
     "trends": "trend|trends|trending|趋势|变化趋势",
-    "reduction": "reduce|reducing|reduction|decrease|target|targets|lower|exposure|减量|减少|降低|暴露|目标",
+    "reduction": "reduce|reducing|reduction|riduzione|reduccion|decrease|target|targets|lower|exposure|减量|减少|降低|暴露|目标",
     "prevention": "biosecurity|prevention|vaccination|vaccinations|infection control|预防|防控|生物安全|免疫",
     "laboratory": "laboratory|laboratories|lab|实验室",
     "prescribing": "prescribing|prescription|prescriptions|audit|处方|审计",
     "environment": "environment|environmental|wastewater|环境|废水",
+    "livelihood": "livelihood|livelihoods|rural incomes|生计|谋生",
     "herd": "herd|herds|herd health|畜群|牛群健康",
     "food": "food safety|food chain|food system|food systems|食品安全|食物系统|食品链",
 }
 COUNTRIES = {
-    "zambia": "zambia|zambian|zambias|赞比亚", "uk": "united kingdom|uk|british|england|英国",
+    "zambia": "zambia|zambie|zambian|zambias|赞比亚", "uk": "united kingdom|uk|british|england|英国",
     "france": "france|french|法国", "czechia": "czech|czechia|czech republic|捷克",
     "india": "india|indian|印度", "vietnam": "vietnam|viet nam|vietnamese|越南",
-    "italy": "italy|italian|意大利", "china": "china|chinese|中国",
+    "italy": "italy|italia|italie|italian|意大利", "china": "china|chinese|中国",
     "usa": "united states|united states of america|usa|u.s.|美国",
     "kenya": "kenya|kenyan|肯尼亚", "ghana": "ghana|ghanaian|加纳",
     "uganda": "uganda|ugandan|乌干达", "ethiopia": "ethiopia|ethiopian|埃塞俄比亚",
@@ -140,7 +141,7 @@ class Features:
     @classmethod
     def of(cls, text):
         text = _normalize(text)
-        return cls(_words(text), _matches(text, VOCAB, TERM_RE), _matches(text, GEO, GEO_RE))
+        return cls(_words(text), _matches(text, VOCAB, TERM_RE), _matches(re.sub(r"\bthai nguyen\b", "", text), GEO, GEO_RE))
 
 
 def _stage(title, body, concepts):
@@ -318,7 +319,7 @@ class BriefIndex:
             for token in tokens | deck.places | deck.concepts | deck.words:
                 self._postings[token].add(i)
 
-    def search(self, topic: str, limit: int, *, sectors: Sequence[str] = ()) -> list[dict]:
+    def search(self, topic: str, limit: int, *, sectors: Sequence[str] = (), min_year: int | None = None) -> list[dict]:
         if not topic.strip() or limit < 1:
             return []
         q = Features.of(topic)
@@ -332,6 +333,10 @@ class BriefIndex:
         ranked = []
         for i in sorted(candidates):
             page = self.pages[i]
+            if min_year is not None:
+                issued = re.match(r"^(?:19|20)\d{2}", page.get("issued") or "")
+                if not issued or int(issued[0]) < min_year:
+                    continue
             if sectors and page["sector"] not in sectors:
                 continue
             body, title, deck = self._fields[i]
@@ -373,6 +378,8 @@ class BriefIndex:
                 # a matching source, but country/title alone never makes a slide evidence.
                 if not (body.concepts - WIDE and (q.concepts & deck.concepts or q.places & deck.places)):
                     continue
+            if not q.concepts and not q.places and len(keywords) >= 3 and len(keywords & (body.words | deck.words)) < 2:
+                continue
             if not q.concepts and not q.places and not keywords & body.words:
                 continue
             score = sum((1 + math.log((len(self.pages) + 1) / (1 + self._df[t])))
@@ -468,11 +475,15 @@ def build_brief_index(corpus_dir: Path, index_path: Path | None = None) -> Brief
                    PRIMARY KEY (deck_id, slide_number), FOREIGN KEY(deck_id, slide_number)
                    REFERENCES brief_slides_v1(deck_id, slide_number) ON DELETE CASCADE)""")
         db.execute("CREATE TABLE IF NOT EXISTS brief_cache_version (version INTEGER PRIMARY KEY)")
-        if db.execute("SELECT version FROM brief_cache_version").fetchone() != (2,):
-            # Revision 2 includes editable chart labels in slide text.
-            db.execute("DELETE FROM brief_decks_v1")
+        previous = db.execute("SELECT version FROM brief_cache_version").fetchone()
+        if previous != (3,):
+            # Revision 2 added editable chart labels. Revision 3 only updates multilingual features.
+            if previous == (2,):
+                db.execute("DELETE FROM brief_terms_v2")
+            else:
+                db.execute("DELETE FROM brief_decks_v1")
             db.execute("DELETE FROM brief_cache_version")
-            db.execute("INSERT INTO brief_cache_version VALUES (2)")
+            db.execute("INSERT INTO brief_cache_version VALUES (3)")
         old = {r[0]: (r[1], r[2]) for r in db.execute("SELECT deck_id,sha256,source_url FROM brief_decks_v1")}
         active = set()
         for row in rows:

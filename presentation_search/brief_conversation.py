@@ -70,7 +70,10 @@ def _request(text):
         return "", pages
     topic = _COUNT.sub(" ", text)
     marker = re.search(r"(?:主题(?:是|为|[:：])|主题为|关于|topic(?: is|[:：])|\babout\b|\bon\b)", topic, re.I)
-    if marker:
+    # A preposition inside a substantive question is part of the retrieval scope.
+    # Only remove it when everything before it merely frames a presentation request.
+    frame = r"(?:(?:make|create|prepare|build|please|a|an|me|give|presentation|ppt|deck|brief|slides?|pages?|powerpoint|do|talk|tell)\b|[\s,，。:：、-]|请|帮我|给我|我想要|我想|我要|做|准备|制作|生成|一份|一个|幻灯片|简报|演示文稿)*"
+    if marker and re.fullmatch(frame, topic[:marker.start()], re.I):
         topic = topic[marker.end():]
     else:
         # Remove conversational framing only at the edges; keep policy and agency names intact.

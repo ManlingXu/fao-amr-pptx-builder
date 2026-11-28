@@ -71,3 +71,29 @@ jobs:
           finally {
             if (!$proc.HasExited) { taskkill /T /F /PID $proc.Id | Out-Null }
           }
+      - name: Build and download a deck with the Studio Windows launcher
+        shell: pwsh
+        run: |
+          $root = 'http://127.0.0.1:8768'
+          $proc = Start-Process cmd.exe -ArgumentList '/d /c start-studio.cmd' -PassThru
+          try {
+            $deadline = (Get-Date).AddMinutes(2)
+            do {
+              if ($proc.HasExited) { throw 'Studio exited before startup.' }
+              try { $state = Invoke-RestMethod "$root/api/session" -SessionVariable visitor -TimeoutSec 3 -ErrorAction Stop }
+              catch { Start-Sleep -Seconds 1 }
+            } until ($state -or (Get-Date) -gt $deadline)
+            if (!$state.authenticated) { throw 'Local Studio session unavailable.' }
+            $brief = @{message='Zambia antimicrobial stewardship'; settings=@{count=2; model='offline'; mode='reconstruction'}} | ConvertTo-Json
+            $outline = Invoke-RestMethod "$root/api/chat" -Method Post -WebSession $visitor -ContentType 'application/json' -Body $brief
+            if ($outline.slides.Count -lt 1) { throw 'No sourced slide found.' }
+            $export = Invoke-RestMethod "$root/api/export" -Method Post -WebSession $visitor -ContentType 'application/json' -Body '{}'
+            $deck = $export.versions[-1].files.pptx
+            Invoke-WebRequest "$root$deck" -WebSession $visitor -OutFile build/studio-windows.pptx
+            .\.venv\Scripts\python.exe -c "from pptx import Presentation; assert len(Presentation('build/studio-windows.pptx').slides) > 0"
+            if ($LASTEXITCODE -ne 0) { throw 'Exported file could not be opened.' }
+            .\stop-studio.cmd
+            if ($LASTEXITCODE -ne 0 -or !$proc.WaitForExit(10000)) { throw 'Studio did not stop cleanly.' }
+          } finally {
+            if (!$proc.HasExited) { taskkill /T /F /PID $proc.Id | Out-Null }
+          }
