@@ -45,7 +45,7 @@ def main():
               "platform": platform.system() + " " + platform.machine(),
               "brief": BRIEF, "settings": SETTINGS, "model_calls_to_paid_services": 0,
               "corpus_manifest_sha256": hashlib.sha256((corpus / "verified.csv").read_bytes()).hexdigest(),
-              "method": "One matched Studio drafting turn per provider. Local model generate and load times are recorded in the daemon response. Source identity is checked against the offline control. This is a functional example, not an accuracy benchmark.",
+              "method": "One matched Studio drafting turn per provider using a preloaded source index. Wall time includes any model load; Ollama reports token counts and inference times separately. Source identity is checked against the offline control. One case measures functionality and supports a qualitative review.",
               "runs": []}
 
     with tempfile.TemporaryDirectory() as temp:

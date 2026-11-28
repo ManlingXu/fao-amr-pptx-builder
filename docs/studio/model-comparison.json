@@ -12,7 +12,7 @@
   },
   "model_calls_to_paid_services": 0,
   "corpus_manifest_sha256": "6acf87bed83b4d555e28bc5e82d9e0ff89544b82f31b493381efd0a6285cb560",
-  "method": "One matched Studio drafting turn per provider. Local model generate and load times are recorded in the daemon response. Source identity is checked against the offline control. This is a functional example, not an accuracy benchmark.",
+  "method": "One matched Studio drafting turn per provider using a preloaded source index. Wall time includes any model load; Ollama reports token counts and inference times separately. Source identity is checked against the offline control. One case measures functionality and supports a qualitative review.",
   "runs": [
     {
       "provider": "offline",
@@ -195,5 +195,84 @@
     "qwen3:4b": "Both original page references and source excerpts were preserved. The questions in the notes were tailored to outreach coordinators. On page 8 the generated body added claims about stopping infections and a programme aim of reducing antimicrobial resistance through responsible antibiotic use. Neither claim was stated in that page excerpt. Page 10 omitted civic leaders. Treat these as unsupported elaboration and an omission requiring editing.",
     "qwen3:0.6b": "The slide bodies reproduced both source excerpts verbatim, including the civic leaders on page 10. Notes on page 8 strengthened a link to a causal improvement. Page 10 notes said outreach ensured all relevant stakeholders were engaged; the source only named groups reached.",
     "interpretation": "Matching source IDs, evidence and numeric strings verifies provenance only. Verify synthesized claims and notes against the full original slide and remove unsupported claims before presentation. The measured latency includes model load; this single pair of outputs does not rank the models across tasks."
+  },
+  "repeat_with_final_schema": {
+    "run_utc": "2026-11-28T02:12:05+00:00",
+    "purpose": "Verify the final decoder schema with nonempty and maximum-length fields. Both models reproduced the first measured outputs exactly.",
+    "runs": [
+      {
+        "model": "offline",
+        "status": "completed",
+        "wall_seconds": 0.008,
+        "calls": [],
+        "page_content_identical": true
+      },
+      {
+        "model": "qwen3:4b",
+        "status": "completed",
+        "wall_seconds": 45.583,
+        "calls": [
+          {
+            "prompt_eval_count": 263,
+            "eval_count": 231,
+            "done_reason": "stop",
+            "total_duration_seconds": 45.504,
+            "load_duration_seconds": 10.641,
+            "prompt_eval_duration_seconds": 6.521,
+            "eval_duration_seconds": 28.331,
+            "page_ids_returned": [
+              "P1",
+              "P2"
+            ],
+            "output_field_lengths": [
+              {
+                "title": 33,
+                "body": 394,
+                "notes": 145
+              },
+              {
+                "title": 38,
+                "body": 312,
+                "notes": 136
+              }
+            ]
+          }
+        ],
+        "page_content_identical": true
+      },
+      {
+        "model": "qwen3:0.6b",
+        "status": "completed",
+        "wall_seconds": 7.587,
+        "calls": [
+          {
+            "prompt_eval_count": 269,
+            "eval_count": 162,
+            "done_reason": "stop",
+            "total_duration_seconds": 7.508,
+            "load_duration_seconds": 2.34,
+            "prompt_eval_duration_seconds": 0.955,
+            "eval_duration_seconds": 4.206,
+            "page_ids_returned": [
+              "P1",
+              "P2"
+            ],
+            "output_field_lengths": [
+              {
+                "title": 33,
+                "body": 136,
+                "notes": 153
+              },
+              {
+                "title": 38,
+                "body": 108,
+                "notes": 134
+              }
+            ]
+          }
+        ],
+        "page_content_identical": true
+      }
+    ]
   }
 }
